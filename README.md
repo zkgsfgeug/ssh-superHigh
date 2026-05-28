@@ -43,13 +43,16 @@
 
 ---
 
-🚀 دستور نصب | Installation Command
-برای نصب سریع، دستور زیر را اجرا کنید:
+## 🚀 دستور نصب | Installation Command
 
-bash
+یک خط دستور زیر را در سرور خود کپی و اجرا کنید:
+
+```bash
 curl -s https://raw.githubusercontent.com/zkgsfgeug/ssh-superHigh/main/install.sh | bash
-🛠️ مدیریت پنل | Panel Management
-برای ورود به پنل مدیریت و مدیریت کاربران، از دستور زیر استفاده کنید:
 
-bash
+---
+
+## 🚀 دستور اجرای پنل و ورود به پنل مدیریت
+```bash
 shadow-panel
+ این 2 تا دستورات زیر چرا کادر هاشون جدا نشده درستش کن و کاملشو بفرست
