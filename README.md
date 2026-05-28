@@ -43,14 +43,11 @@
 
 ---
 
-## 🚀 دستور نصب | Installation Command
+## 📦 دستورات سریع | Quick Commands
 
-یک خط دستور زیر را در سرور خود کپی و اجرا کنید:
-##دستور نصب پنل
+<div dir="ltr">
+
+### ❶ نصب | Installation
+
 ```bash
 curl -s https://raw.githubusercontent.com/zkgsfgeug/ssh-superHigh/main/install.sh | bash
-
----
-
-## 🚀 دستور اجرای پنل و ورود به پنل مدیریت
-shadow-panel
