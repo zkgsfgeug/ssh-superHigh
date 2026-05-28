@@ -50,6 +50,8 @@
 ```bash
 curl -s https://raw.githubusercontent.com/zkgsfgeug/ssh-superHigh/main/install.sh | bash
 
+---
+
 ## 🚀 دستور اجرای پنل و ورود به پنل مدیریت
 ```bash
 shadow-panel
