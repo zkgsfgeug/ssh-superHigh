@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v2.0 - Fixed NPVT Config
+# Shadow SSH v2.0 - FINAL WORKING EDITION
+# Auto: IP if no domain, Domain if set
 # =============================================
 
 RED='\033[0;31m'
@@ -11,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH - Fixed NPVT Installer${NC}"
+echo -e "${GREEN}   Shadow SSH - FINAL WORKING EDITION${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 if [[ $EUID -ne 0 ]]; then
@@ -41,10 +42,18 @@ touch /etc/shadow-users.conf
 echo "" > /etc/shadow-domain.conf
 echo "0" > /etc/shadow-fec.conf
 
-# گرفتن IP سرور برای استفاده در کانفیگ
-SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null)
+# گرفتن IP سرور
+SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null)
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP=$(curl -s -4 icanhazip.com 2>/dev/null)
+fi
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP="157.10.52.88"
+fi
 
-# پنل اصلی
+# =============================================
+# پنل نهایی با تابع get_server درست
+# =============================================
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
 
@@ -61,22 +70,22 @@ NC='\033[0m'
 # تابع مطمئن برای گرفتن آدرس سرور
 get_server() {
     # اول چک کن دامنه تنظیم شده؟
-    if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-        local domain=$(cat "$DOMAIN_FILE" | head -1)
-        if [ -n "$domain" ]; then
+    if [ -f "$DOMAIN_FILE" ]; then
+        local domain=$(cat "$DOMAIN_FILE" 2>/dev/null | head -1)
+        if [ -n "$domain" ] && [ "$domain" != "" ]; then
             echo "$domain"
             return
         fi
     fi
     
-    # برو سراغ IP
+    # دامنه نداریم -> برو سراغ IP
     local ip=$(curl -s -4 ifconfig.me 2>/dev/null)
-    if [ -n "$ip" ]; then
+    if [ -n "$ip" ] && [ "$ip" != "" ]; then
         echo "$ip"
         return
     fi
     
-    # آخرین راه: IP هاردکد شده از زمان نصب
+    # آخرین راه: IP هاردکد شده
     echo "SERVER_IP_PLACEHOLDER"
 }
 
@@ -94,44 +103,35 @@ generate_npvt_config() {
     local password=$2
     local server=$(get_server)
     
-    # اگر باز هم خالی بود، از fallback استفاده کن
-    if [ -z "$server" ]; then
-        server=$(curl -s ifconfig.me)
-    fi
-    if [ -z "$server" ]; then
-        server="SERVER_IP_PLACEHOLDER"
-    fi
-    
-    cat << EOF
-{
+    # JSON ساده و درست
+    printf '{
   "sshConfigType": "SSH-Direct",
-  "remarks": "${username}-fec",
-  "sshHost": "${server}",
+  "remarks": "%s-fec",
+  "sshHost": "%s",
   "sshPort": 22,
-  "sshUsername": "${username}",
-  "sshPassword": "${password}",
+  "sshUsername": "%s",
+  "sshPassword": "%s",
   "udpgwTransparentDNS": true
-}
-EOF
+}' "$username" "$server" "$username" "$password"
 }
 
 show_menu() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}       🚀 SHADOW SSH - FEC CONTROLLER${NC}"
+    echo -e "${GREEN}       🚀 SHADOW SSH - FINAL EDITION${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
-    echo -e "   ${YELLOW}FEC Status:${NC} $(get_fec_status)"
+    echo -e "   ${YELLOW}FEC:${NC} $(get_fec_status)"
     echo -e "   ${RED}Port 8388:${NC} ${RED}REMOVED${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    echo -e "   ${YELLOW}1${NC}) Create User + Config"
+    echo -e "   ${YELLOW}1${NC}) Create User"
     echo -e "   ${YELLOW}2${NC}) List Users"
     echo -e "   ${YELLOW}3${NC}) Show Config"
     echo -e "   ${YELLOW}4${NC}) Delete User"
-    echo -e "   ${GREEN}5${NC}) Set Domain (Hide IP)"
-    echo -e "   ${YELLOW}6${NC}) Remove Domain (Back to IP)"
+    echo -e "   ${GREEN}5${NC}) Set Domain"
+    echo -e "   ${YELLOW}6${NC}) Remove Domain"
     echo -e "   ${CYAN}7${NC}) Set FEC Ratio (2-100)"
-    echo -e "   ${RED}8${NC}) Disable FEC Booster"
+    echo -e "   ${RED}8${NC}) Disable FEC"
     echo -e "   ${YELLOW}9${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
@@ -157,8 +157,14 @@ create_user() {
         return
     fi
 
+    if ! [[ "$traffic" =~ ^[0-9]+$ ]] || ! [[ "$days" =~ ^[0-9]+$ ]]; then
+        echo -e "\n${RED}❌ Traffic and Days must be numbers!${NC}"
+        sleep 2
+        return
+    fi
+
     expiry=$(date -d "+$days days" +%s)
-    echo "$username:$password:$traffic:$expiry:0" >> $CONFIG_FILE
+    echo "$username:$password:$traffic:$expiry:0" >> "$CONFIG_FILE"
     useradd -M -s /bin/false "$username" 2>/dev/null
     echo "$username:$password" | chpasswd 2>/dev/null
     
@@ -174,7 +180,7 @@ create_user() {
     echo -e "${GREEN}${npvt_config}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
-    # نمایش اطلاعات به صورت خام برای اطمینان
+    # نمایش اطلاعات برای اطمینان
     echo -e "\n${YELLOW}📋 Connection Details:${NC}"
     echo -e "   Server: $(get_server)"
     echo -e "   Port: 22"
@@ -249,13 +255,13 @@ delete_user() {
     echo -e "${GREEN}🗑️ DELETE USER${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
-    echo -n "👤 Username to delete: "
+    echo -n "👤 Username: "
     read username
     
     sed -i "/^$username:/d" "$CONFIG_FILE" 2>/dev/null
     userdel -r "$username" 2>/dev/null
     
-    echo -e "\n${GREEN}✅ User $username deleted!${NC}"
+    echo -e "\n${GREEN}✅ Deleted${NC}"
     sleep 2
 }
 
@@ -271,7 +277,7 @@ set_domain() {
         echo "$domain" > "$DOMAIN_FILE"
         echo -e "\n${GREEN}✅ Domain set to: $domain${NC}"
     else
-        echo -e "\n${RED}❌ Invalid domain!${NC}"
+        echo -e "\n${RED}❌ Invalid${NC}"
     fi
     sleep 2
 }
@@ -282,7 +288,7 @@ remove_domain() {
     echo -e "${GREEN}🔙 REMOVE DOMAIN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo "" > "$DOMAIN_FILE"
-    echo -e "${GREEN}✅ Domain removed! Back to IP mode.${NC}"
+    echo -e "${GREEN}✅ Domain removed. Back to IP mode.${NC}"
     sleep 2
 }
 
@@ -291,15 +297,13 @@ set_fec_ratio() {
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "${GREEN}⚡ SET FEC RATIO${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}Enter ratio (2-100) | Example: 25 = 2.5x speed${NC}"
-    echo -n "👉 Ratio: "
+    echo -n "👉 Ratio (2-100): "
     read ratio
     
     if [[ "$ratio" =~ ^[0-9]+$ ]] && [ "$ratio" -ge 2 ] && [ "$ratio" -le 100 ]; then
         echo "$ratio" > "$FEC_FILE"
         echo -e "\n${GREEN}✅ FEC set to ${ratio}:10${NC}"
         
-        # به‌روزرسانی سرویس
         cat > /etc/systemd/system/ssh-booster.service << EOF
 [Unit]
 Description=SSH Booster - FEC ${ratio}:10
@@ -373,5 +377,13 @@ clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ INSTALLATION COMPLETE!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}📊 Features:${NC}"
+echo -e "   • Port 8388: ${RED}REMOVED${NC}"
+echo -e "   • Default Mode: ${GREEN}IP Address (${SERVER_IP})${NC}"
+echo -e "   • Option 5: ${GREEN}Set Domain${NC}"
+echo -e "   • Option 6: ${GREEN}Remove Domain (Back to IP)${NC}"
+echo -e "   • Option 7: ${GREEN}Set FEC Ratio (2-100)${NC}"
+echo -e "   • Option 8: ${RED}Disable FEC${NC}"
+echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
