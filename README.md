@@ -10,9 +10,9 @@
 
 ## 📋 معرفی | Introduction
 
-**Shadow SSH** یک ابزار حرفه‌ای برای تبدیل SSH معمولی به تونلی فوق‌العاده سریع با استفاده از شتاب‌دهنده UDP، الگوریتم BBR و بهینه‌سازی‌های کرنل است. این ابزار سرعت اتصال شما را **۵ تا ۱۰ برابر** افزایش می‌دهد و با استفاده از تکنولوژی‌های UDPspeeder و UDP2RAW، پکت‌های از دست رفته را بازیابی کرده و از فایروال‌ها عبور می‌کند.
+**Shadow SSH** یک ابزار حرفه‌ای برای تبدیل SSH معمولی به تونلی فوق‌العاده سریع با استفاده از شتاب‌دهنده UDP، الگوریتم BBR و بهینه‌سازی‌های کرنل است. این ابزار سرعت اتصال شما را **۵ تا ۱۰ برابر** افزایش می‌دهد.
 
-**Shadow SSH** is a professional tool that transforms regular SSH connections into ultra-fast tunnels using UDP acceleration, BBR congestion control, and kernel optimizations. It increases your connection speed by **5-10x** and recovers lost packets while bypassing firewalls using UDPspeeder and UDP2RAW technologies.
+**Shadow SSH** is a professional tool that transforms regular SSH connections into ultra-fast tunnels using UDP acceleration, BBR congestion control, and kernel optimizations, increasing speed by **5-10x**.
 
 ---
 
@@ -28,7 +28,6 @@
 | 🎛️ **پنل خط فرمان** ساده و قدرتمند | 🎛️ **Simple CLI panel** |
 | 🔗 **خروجی دو کانفیگ** (پورت ۲۲ و ۸۳۸۸) | 🔗 **Dual config output** (Port 22 & 8388) |
 | 💾 **مصرف کم منابع** (کمتر از ۵۰ مگ رم) | 💾 **Low resource usage** (<50MB RAM) |
-| 🔧 **نصب با یک دستور** | 🔧 **One-command installation** |
 
 ---
 
@@ -44,9 +43,9 @@
 
 ---
 
-## 🚀 نصب | Installation
+## 🚀 دستور نصب | Installation Command
 
-### مرحله ۱: اتصال به سرور | Step 1: Connect to your server
+یک خط دستور زیر را در سرور خود کپی و اجرا کنید:
 
 ```bash
-ssh root@YOUR_SERVER_IP
+curl -s https://raw.githubusercontent.com/zkgsfgeug/ssh-superHigh/main/install.sh | bash
