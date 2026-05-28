@@ -1,3 +1,6 @@
+
+                                               کپی رایت فقط فقط با ذکر منبع کجاز است 
+
 # Shadow SSH v2.0 🚀
 
 **Ultra Fast SSH Tunnel with Built-in Booster | افزایش سرعت ۵ تا ۱۰ برابری**
