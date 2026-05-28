@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v2.0 - Nezha Config Edition
+# Shadow SSH v2.0 - NPVT VPN Format
 # =============================================
 
 RED='\033[0;31m'
@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v2.0 - Nezha Config Edition${NC}"
+echo -e "${GREEN}   Shadow SSH - NPVT VPN Config Installer${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 if [[ $EUID -ne 0 ]]; then
@@ -19,61 +19,46 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Clean previous
+# پاکسازی قبلی
 pkill -9 shadow 2>/dev/null
-rm -f /usr/local/bin/shadow /etc/shadow-*.conf
+rm -f /usr/local/bin/shadow
+rm -f /etc/shadow-users.conf
+rm -f /etc/shadow-domain.conf
 
-# Fix dpkg
+# رفع مشکلات
 dpkg --configure -a 2>/dev/null
 apt-get install -f -y 2>/dev/null
 
-# Install dependencies
+# نصب پیش‌نیازها
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 apt update -y
-apt install -y curl wget coreutils openssh-server ufw
+apt install -y curl wget coreutils openssh-server
 
-# Remove port 8388
+# حذف پورت 8388
 sed -i '/Port 8388/d' /etc/ssh/sshd_config 2>/dev/null
 sed -i '/Port 8389/d' /etc/ssh/sshd_config 2>/dev/null
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 
-# Create config files
+# ایجاد فایل‌ها
 touch /etc/shadow-users.conf
-touch /etc/shadow-domain.conf
-
-# Set default domain
 echo "arvinam.duckdns.org" > /etc/shadow-domain.conf
 
-# Install UDP2RAW + UDPspeeder for speed boost
-echo -e "${YELLOW}⚡ Installing speed boosters...${NC}"
-apt install -y git gcc make libsodium-dev
-git clone https://github.com/wangyu-/udp2raw-tunnel.git
-cd udp2raw-tunnel && make && make install && cd ..
-git clone https://github.com/wangyu-/UDPspeeder.git
-cd UDPspeeder && make && make install && cd ..
-rm -rf udp2raw-tunnel UDPspeeder
+# بهینه‌سازی کرنل
+echo -e "${YELLOW}⚡ Optimizing kernel...${NC}"
+cat >> /etc/sysctl.conf << 'EOF'
 
-# Create booster service for port 22
-cat > /etc/systemd/system/ssh-booster.service << EOF
-[Unit]
-Description=SSH Port 22 Booster
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/bin/bash -c 'socat TCP4-LISTEN:22,fork,reuseaddr TCP4:127.0.0.1:60022 & udp2raw -s -l 0.0.0.0:4096 -r 127.0.0.1:8389 -k "shadow123" --raw-mode faketcp -a & UDPspeeder -s -l 0.0.0.0:8389 -r 127.0.0.1:22 -k "shadow123" --timeout 1 -f 5:3'
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
+net.core.rmem_max = 268435456
+net.core.wmem_max = 268435456
+net.ipv4.tcp_rmem = 4096 87380 268435456
+net.ipv4.tcp_wmem = 4096 65536 268435456
+net.ipv4.tcp_congestion_control = bbr
+net.core.default_qdisc = fq
+net.ipv4.tcp_fastopen = 3
 EOF
 
-systemctl daemon-reload
-systemctl enable ssh-booster.service
-systemctl start ssh-booster.service
+sysctl -p > /dev/null 2>&1
 
-# Create main panel
+# ایجاد پنل با فرمت NPVT
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
 
@@ -94,66 +79,43 @@ get_server() {
     fi
 }
 
-# Generate Nezha/Sing-Box config
-generate_config() {
-    local user=$1
-    local pass=$2
+generate_npvt_config() {
+    local username=$1
+    local password=$2
     local server=$(get_server)
+    local port="22"
     
-    # Base64 encode for Nezha format
-    local config_raw="${user}:${pass}@${server}:22"
-    local config_b64=$(echo -n "$config_raw" | base64 -w 0)
-    
-    cat << EOF
-
-${BLUE}════════════════════════════════════════════${NC}
-${GREEN}📱 NEZHA / SING-BOX CONFIG${NC}
-${BLUE}════════════════════════════════════════════${NC}
-
-${YELLOW}🔗 SSH Direct:${NC}
-   ssh ${user}@${server} -p 22
-
-${YELLOW}📦 Nezha Config (Base64):${NC}
-   ${GREEN}${config_b64}${NC}
-
-${YELLOW}📦 Nezha Config (Raw):${NC}
-   ${GREEN}${config_raw}${NC}
-
-${YELLOW}📱 Sing-Box JSON:${NC}
-${GREEN}{
-  "outbounds": [
-    {
-      "type": "ssh",
-      "tag": "ssh-${user}",
-      "server": "${server}",
-      "server_port": 22,
-      "user": "${user}",
-      "password": "${pass}"
-    }
-  ]
-}${NC}
-
-${YELLOW}🔗 Clash Meta:${NC}
-   ssh://${config_raw}
-
-${BLUE}════════════════════════════════════════════${NC}
+    # ساخت JSON برای NPVT
+    local json_data=$(cat <<EOF
+{
+  "sshConfigType": "SSH-Direct",
+  "remarks": "${username}-regular",
+  "sshHost": "${server}",
+  "sshPort": ${port},
+  "sshUsername": "${username}",
+  "sshPassword": "${password}",
+  "udpgwTransparentDNS": true
+}
 EOF
+)
+    # تبدیل به Base64
+    local config_b64=$(echo -n "$json_data" | base64 -w 0)
+    echo "npvt-ssh://${config_b64}"
 }
 
 show_menu() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}       🚀 SHADOW SSH v2.0 - NEZHA EDITION${NC}"
+    echo -e "${GREEN}       🚀 SHADOW SSH - NPVT VPN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "   ${YELLOW}SSH Port:${NC} 22 ${GREEN}(Super Boosted - UDP Accelerated)${NC}"
-    echo -e "   ${RED}Port 8388:${NC} ${RED}REMOVED${NC}"
-    echo -e "   ${GREEN}Domain: $(get_server)${NC}"
+    echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
+    echo -e "   ${YELLOW}Port 8388:${NC} ${RED}REMOVED${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    echo -e "   ${YELLOW}1${NC}) Create New User + Get Config"
-    echo -e "   ${YELLOW}2${NC}) List All Users"
-    echo -e "   ${YELLOW}3${NC}) Show Config for Existing User"
+    echo -e "   ${YELLOW}1${NC}) Create User + NPVT Config"
+    echo -e "   ${YELLOW}2${NC}) List Users"
+    echo -e "   ${YELLOW}3${NC}) Show Config"
     echo -e "   ${YELLOW}4${NC}) Delete User"
-    echo -e "   ${GREEN}5${NC}) Change Domain"
+    echo -e "   ${YELLOW}5${NC}) Change Domain"
     echo -e "   ${YELLOW}6${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
@@ -161,16 +123,16 @@ show_menu() {
 create_user() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}✨ CREATE NEW USER${NC}"
+    echo -e "${GREEN}✨ CREATE USER${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
     echo -n "👤 Username: "
     read username
     echo -n "🔑 Password: "
     read password
-    echo -n "📊 Traffic Limit (GB): "
+    echo -n "📊 Traffic GB: "
     read traffic
-    echo -n "📅 Days Valid: "
+    echo -n "📅 Days: "
     read days
 
     if [ -z "$username" ] || [ -z "$password" ] || [ -z "$traffic" ] || [ -z "$days" ]; then
@@ -178,50 +140,54 @@ create_user() {
         sleep 2
         return
     fi
-    
+
     if ! [[ "$traffic" =~ ^[0-9]+$ ]] || ! [[ "$days" =~ ^[0-9]+$ ]]; then
-        echo -e "\n${RED}❌ Must be numbers!${NC}"
+        echo -e "\n${RED}❌ Traffic and Days must be numbers!${NC}"
         sleep 2
         return
     fi
 
-    local expiry=$(date -d "+$days days" +%s)
-    echo "$username:$password:$traffic:$expiry:0" >> "$CONFIG_FILE"
+    expiry=$(date -d "+$days days" +%s)
+    echo "$username:$password:$traffic:$expiry:0" >> $CONFIG_FILE
     useradd -M -s /bin/false "$username" 2>/dev/null
     echo "$username:$password" | chpasswd 2>/dev/null
     
+    # تولید کانفیگ NPVT
+    local npvt_config=$(generate_npvt_config "$username" "$password")
+    
     clear
-    echo -e "${GREEN}✅ USER CREATED SUCCESSFULLY!${NC}"
-    generate_config "$username" "$password"
-    echo -e "\n${YELLOW}Press Enter to continue...${NC}"
+    echo -e "${GREEN}✅ USER CREATED!${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}📱 NPVT VPN CONFIG (Copy this):${NC}"
+    echo -e "${BLUE}────────────────────────────────────────────${NC}"
+    echo -e "${GREEN}${npvt_config}${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
 
 list_users() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}📋 ACTIVE USERS${NC}"
+    echo -e "${GREEN}📋 USERS LIST${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-
+    
     if [ ! -s "$CONFIG_FILE" ]; then
         echo -e "${RED}❌ No users found${NC}"
-        echo -e "\n${YELLOW}Press Enter...${NC}"
-        read dummy
-        return
+    else
+        printf "   %-15s %-10s %-10s\n" "USERNAME" "EXPIRE" "TRAFFIC"
+        echo -e "${BLUE}────────────────────────────────────────────${NC}"
+        
+        local current_time=$(date +%s)
+        while IFS=: read -r user pass traffic expiry used; do
+            local remaining_days=$(( (expiry - current_time) / 86400 ))
+            if [ $remaining_days -lt 0 ]; then
+                printf "   ${RED}%-15s EXPIRED   %-10s${NC}\n" "$user" "${traffic}GB"
+            else
+                printf "   ${GREEN}%-15s${NC} %-10s %-10s\n" "$user" "${remaining_days}d" "${traffic}GB"
+            fi
+        done < "$CONFIG_FILE"
     fi
-
-    local current_time=$(date +%s)
-    printf "   %-15s %-12s %-10s\n" "USER" "EXPIRES" "TRAFFIC"
-    echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    
-    while IFS=: read -r user pass traffic expiry used; do
-        local remaining=$(( (expiry - current_time) / 86400 ))
-        if [ $remaining -lt 0 ]; then
-            printf "   ${RED}%-15s EXPIRED     %-10s${NC}\n" "$user" "${traffic}GB"
-        else
-            printf "   ${GREEN}%-15s${NC} %-12s %-10s\n" "$user" "${remaining}d" "${traffic}GB"
-        fi
-    done < "$CONFIG_FILE"
     
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "\n${YELLOW}Press Enter...${NC}"
@@ -249,25 +215,38 @@ show_config() {
         return
     fi
     
-    local user_info=$(grep "^$username:" "$CONFIG_FILE")
-    local user_pass=$(echo "$user_info" | cut -d: -f2)
+    local password=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
+    local npvt_config=$(generate_npvt_config "$username" "$password")
     
     clear
-    generate_config "$username" "$user_pass"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}📱 NPVT VPN CONFIG for ${username}:${NC}"
+    echo -e "${BLUE}────────────────────────────────────────────${NC}"
+    echo -e "${GREEN}${npvt_config}${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
 
 delete_user() {
-    read -p "👤 Username to delete: " username
+    clear
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}🗑️ DELETE USER${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    echo -n "👤 Username to delete: "
+    read username
+    
     if [ -z "$username" ]; then
-        echo -e "${RED}❌ Required!${NC}"
+        echo -e "\n${RED}❌ Username required!${NC}"
         sleep 2
         return
     fi
-    sed -i "/^$username:/d" "$CONFIG_FILE"
+    
+    sed -i "/^$username:/d" "$CONFIG_FILE" 2>/dev/null
     userdel -r "$username" 2>/dev/null
-    echo -e "${GREEN}✅ Deleted${NC}"
+    
+    echo -e "\n${GREEN}✅ User $username deleted!${NC}"
     sleep 2
 }
 
@@ -276,13 +255,16 @@ set_domain() {
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "${GREEN}🌐 CHANGE DOMAIN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}Current domain: $(get_server)${NC}"
+    echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -n "👉 New domain: "
     read domain
+    
     if [ -n "$domain" ]; then
         echo "$domain" > "$DOMAIN_FILE"
-        echo -e "${GREEN}✅ Domain changed to: $domain${NC}"
+        echo -e "\n${GREEN}✅ Domain changed to: $domain${NC}"
     else
-        echo -e "${RED}❌ Invalid${NC}"
+        echo -e "\n${RED}❌ Invalid domain!${NC}"
     fi
     sleep 2
 }
@@ -298,39 +280,14 @@ while true; do
         4) delete_user ;;
         5) set_domain ;;
         6) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
-        *) echo -e "${RED}❌ Invalid${NC}"; sleep 1 ;;
+        *) echo -e "${RED}❌ Invalid option${NC}"; sleep 1 ;;
     esac
 done
 INNEREOF
 
 chmod +x /usr/local/bin/shadow
 
-# Super kernel boost
-echo -e "${YELLOW}⚡ Super boosting kernel...${NC}"
-cat >> /etc/sysctl.conf << 'EOF'
-
-# Shadow SSH - Maximum Performance
-net.core.rmem_max = 268435456
-net.core.wmem_max = 268435456
-net.ipv4.tcp_rmem = 4096 87380 268435456
-net.ipv4.tcp_wmem = 4096 65536 268435456
-net.core.netdev_max_backlog = 100000
-net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_congestion_control = bbr
-net.core.default_qdisc = fq
-net.ipv4.tcp_notsent_lowat = 32768
-net.ipv4.tcp_sack = 1
-net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_fin_timeout = 15
-EOF
-
-sysctl -p > /dev/null 2>&1
-
-# Open firewall
 ufw allow 22/tcp 2>/dev/null
-ufw allow 4096/udp 2>/dev/null
 
 clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
@@ -338,9 +295,9 @@ echo -e "${GREEN}✅ INSTALLATION COMPLETE!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}📊 Features:${NC}"
 echo -e "   • Port 8388: ${RED}REMOVED${NC}"
-echo -e "   • SSH Port:  ${GREEN}22 (UDP Boosted - 5-10x faster)${NC}"
+echo -e "   • SSH Port:  ${GREEN}22 (Super Boosted)${NC}"
 echo -e "   • Domain:    ${GREEN}arvinam.duckdns.org${NC}"
-echo -e "   • Config:    ${GREEN}Nezha / Sing-Box / Clash ready${NC}"
+echo -e "   • Output:    ${GREEN}npvt-ssh:// format${NC}"
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
