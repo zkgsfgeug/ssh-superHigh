@@ -23,6 +23,14 @@ if [[ $EUID -ne 0 ]]; then
 fi
 echo -e "${GREEN}[✓] Root access confirmed${NC}"
 
+# ============ GET IPv4 ONLY ============
+echo -e "${YELLOW}[*] Getting IPv4 address...${NC}"
+IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null || curl -s -4 api.ipify.org 2>/dev/null)
+if [[ -z "$IP" ]]; then
+    IP=$(hostname -I | awk '{print $1}')
+fi
+echo -e "${GREEN}[✓] Server IPv4: $IP${NC}"
+
 # ============ KERNEL OPTIMIZATIONS ============
 echo -e "${YELLOW}[1/6] Applying Kernel Optimizations...${NC}"
 cat >> /etc/sysctl.conf << EOF
@@ -109,14 +117,24 @@ echo -e "${YELLOW}[6/6] Installing Shadow Panel...${NC}"
 cat > /usr/local/bin/shadow-panel << 'PANEL'
 #!/bin/bash
 RED="\033[1;31m"; GREEN="\033[1;32m"; YELLOW="\033[1;33m"; BLUE="\033[1;34m"; CYAN="\033[1;36m"; MAGENTA="\033[1;35m"; NC="\033[0m"
-IP=$(curl -s ifconfig.me 2>/dev/null || echo "SERVER_IP")
+
+# Get IPv4 only
+get_ipv4() {
+    IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null || curl -s -4 api.ipify.org 2>/dev/null)
+    if [[ -z "$IP" ]]; then
+        IP=$(hostname -I | awk '{print $1}')
+    fi
+    echo "$IP"
+}
+
+IP=$(get_ipv4)
 
 show_header() {
     clear
     echo -e "${CYAN}========================================${NC}"
     echo -e "${MAGENTA}        SHADOW SSH v2.0 PANEL${NC}"
     echo -e "${CYAN}========================================${NC}"
-    echo -e "${GREEN} Server IP:${NC} $IP"
+    echo -e "${GREEN} Server IPv4:${NC} $IP"
     echo -e "${GREEN} Shadow Port:${NC} 8388 (UDP Accelerated)"
     echo -e "${GREEN} Regular Port:${NC} 22"
     echo -e "${GREEN} Booster:${NC} Active"
@@ -127,7 +145,7 @@ list_users() {
     echo -e "${GREEN}========================================${NC}"
     echo -e "${YELLOW}Existing users:${NC}"
     if [ "$(ls /home 2>/dev/null)" ]; then
-        ls /home 2>/dev/null | while read user; do
+        for user in $(ls /home 2>/dev/null); do
             exp=$(chage -l "$user" 2>/dev/null | grep "Account expires" | cut -d: -f2)
             echo -e "  ${GREEN}▶${NC} $user - Expires: $exp"
         done
@@ -190,6 +208,9 @@ create_user() {
         echo -e "${GREEN}[✓] Traffic limit: ${l}GB${NC}"
     fi
     
+    # Refresh IPv4
+    IP=$(get_ipv4)
+    
     # Regular config (Port 22)
     json1="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"${u}-regular\",\"sshHost\":\"$IP\",\"sshPort\":22,\"sshUsername\":\"$u\",\"sshPassword\":\"$p\",\"udpgwTransparentDNS\":true}"
     enc1=$(echo -n "$json1" | base64 -w 0)
@@ -228,6 +249,17 @@ show_usage() {
     exp=$(chage -l "$u" 2>/dev/null | grep "Account expires" | cut -d: -f2)
     echo -e "${GREEN}User: $u${NC}"
     echo -e "Expires: $exp"
+    
+    # Check traffic usage
+    if iptables -L "${u}_limit" -v -n 2>/dev/null | grep -q "quota"; then
+        used=$(iptables -L "${u}_limit" -v -n 2>/dev/null | grep "quota" | awk '{print $2}')
+        limit=$(iptables -L "${u}_limit" -v -n 2>/dev/null | grep "quota" | sed -n 's/.*quota \([0-9]*\).*/\1/p')
+        if [[ -n "$used" && -n "$limit" ]]; then
+            used_gb=$((used / 1073741824))
+            limit_gb=$((limit / 1073741824))
+            echo -e "Traffic: ${used_gb}GB / ${limit_gb}GB"
+        fi
+    fi
     echo -e "${GREEN}========================================${NC}"
 }
 
@@ -265,6 +297,7 @@ echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${MAGENTA}   ✅ SHADOW SSH v2.0 INSTALLED!${NC}"
 echo -e "${GREEN}========================================${NC}"
+echo -e "${CYAN}Server IPv4:${NC} $IP"
 echo -e "${CYAN}To run the panel, type:${NC} shadow-panel"
 echo -e "${CYAN}Shadow Port (Ultra Speed):${NC} 8388"
 echo -e "${CYAN}Regular Port:${NC} 22"
