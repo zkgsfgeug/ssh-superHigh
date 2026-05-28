@@ -1,304 +1,202 @@
 #!/bin/bash
 
-# Colors
-RED='\033[1;31m'
-GREEN='\033[1;32m'
+# COLOR DEFINITIONS
+RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[1;34m'
-CYAN='\033[1;36m'
-MAGENTA='\033[1;35m'
 NC='\033[0m'
 
-clear
-echo -e "${CYAN}========================================${NC}"
-echo -e "${MAGENTA}        SHADOW SSH v2.0${NC}"
-echo -e "${CYAN}========================================${NC}"
-echo -e "${YELLOW}[*] Installing Ultra Speed Shadow SSH...${NC}"
+# PRE-CHECK: Domain or IP?
+echo -e "${YELLOW}🔧 Shadow SSH v2.0 - Custom Installer${NC}"
+read -p "Do you have a domain pointing to this server? (y/n): " has_domain
 
-# ============ CHECK ROOT ============
-if [[ $EUID -ne 0 ]]; then
-   echo -e "${RED}[✗] This script must be run as root!${NC}"
-   echo -e "${YELLOW}Try: sudo -i${NC}"
-   exit 1
+if [[ "$has_domain" == "y" || "$has_domain" == "Y" ]]; then
+    read -p "Enter your domain (e.g., panel.yourdomain.com): " user_domain
+    DOMAIN_MODE=true
+    PANEL_DOMAIN="$user_domain"
+    echo -e "${GREEN}✅ Domain mode activated: $PANEL_DOMAIN${NC}"
+else
+    DOMAIN_MODE=false
+    PANEL_DOMAIN=$(curl -s ifconfig.me)
+    echo -e "${YELLOW}⚠️ No domain provided. Using IP: $PANEL_DOMAIN${NC}"
 fi
-echo -e "${GREEN}[✓] Root access confirmed${NC}"
 
-# ============ GET IPv4 ONLY ============
-echo -e "${YELLOW}[*] Getting IPv4 address...${NC}"
-IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null || curl -s -4 api.ipify.org 2>/dev/null)
-if [[ -z "$IP" ]]; then
-    IP=$(hostname -I | awk '{print $1}')
-fi
-echo -e "${GREEN}[✓] Server IPv4: $IP${NC}"
+# REMOVE PORT 8388 COMPLETELY
+echo -e "${YELLOW}🚫 Removing problematic port 8388...${NC}"
+sed -i '/8388/d' /etc/ssh/sshd_config 2>/dev/null
+systemctl restart sshd
 
-# ============ KERNEL OPTIMIZATIONS ============
-echo -e "${YELLOW}[1/6] Applying Kernel Optimizations...${NC}"
+# MAXIMIZE PORT 22 PERFORMANCE (No new port, just tuning)
+echo -e "${GREEN}⚡ Boosting Port 22 Speed & Throughput...${NC}"
 cat >> /etc/sysctl.conf << EOF
-# Shadow SSH Optimizations
-net.core.rmem_max = 268435456
-net.core.wmem_max = 268435456
-net.ipv4.tcp_rmem = 4096 87380 268435456
-net.ipv4.tcp_wmem = 4096 65536 268435456
+
+# Shadow SSH Super Boost - Only Port 22
+net.core.rmem_max = 134217728
+net.core.wmem_max = 134217728
+net.ipv4.tcp_rmem = 4096 87380 134217728
+net.ipv4.tcp_wmem = 4096 65536 134217728
+net.core.netdev_max_backlog = 50000
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc = fq
-net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_notsent_lowat = 16384
-net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_dsack = 1
+net.ipv4.tcp_fack = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_max_syn_backlog = 8192
+net.ipv4.ip_local_port_range = 1024 65000
+net.ipv4.tcp_max_tw_buckets = 5000
 EOF
-sysctl -p > /dev/null 2>&1
-echo -e "${GREEN}[✓] Kernel optimized (BBR+FQ)${NC}"
 
-# ============ INSTALL DEPENDENCIES ============
-echo -e "${YELLOW}[2/6] Installing Dependencies...${NC}"
-apt update -qq
-apt install -y -qq openssl iptables curl net-tools wget sudo
-echo -e "${GREEN}[✓] Dependencies installed${NC}"
+sysctl -p
 
-# ============ INSTALL BOOSTER ============
-echo -e "${YELLOW}[3/6] Installing UDP Booster...${NC}"
-apt install -y -qq udp2raw-tunnel udpspeeder 2>/dev/null || echo -e "${YELLOW}[!] UDP tools skipped (optional)${NC}"
+# INSTALL UDP2RAW + UDPSPEEDER (Only for Port 22)
+apt update && apt install -y git gcc make libsodium-dev build-essential
+git clone https://github.com/wangyu-/udp2raw-tunnel.git
+cd udp2raw-tunnel && make && make install
+cd ..
 
-# ============ AUTO BOOSTER SERVICE ============
-echo -e "${YELLOW}[4/6] Creating Auto Booster Service...${NC}"
-cat > /etc/systemd/system/shadow-booster.service << EOF
+git clone https://github.com/wangyu-/UDPspeeder.git
+cd UDPspeeder && make && make install
+cd ..
+
+# CREATE OPTIMIZED SYSTEMD SERVICE FOR PORT 22 BOOST
+cat > /etc/systemd/system/ssh-booster.service << EOF
 [Unit]
-Description=Shadow SSH Booster
+Description=SSH Super Booster (UDP acceleration on port 22)
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/shadow-booster start
+ExecStart=/bin/bash -c 'socat TCP4-LISTEN:22,fork,reuseaddr TCP4:127.0.0.1:60022 & sleep 2 && udp2raw -s -l 0.0.0.0:4096 -r 127.0.0.1:8389 -k "shadow123" --raw-mode faketcp -a & UDPspeeder -s -l 0.0.0.0:8389 -r 127.0.0.1:22 -k "shadow123" --timeout 1 -f 5:3'
 Restart=always
-RestartSec=5
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-cat > /usr/local/bin/shadow-booster << 'BOOSTER'
-#!/bin/bash
-start() {
-    if command -v udpspeeder &> /dev/null; then
-        nohup udpspeeder -l 0.0.0.0:8388 -r 127.0.0.1:22 -k "Shadow2024" -c -f 20:10 --mode 0 --mtu 1500 --log-level 0 > /dev/null 2>&1 &
-        echo "[✓] UDPspeeder active on port 8388"
-    fi
-    if command -v udp2raw &> /dev/null; then
-        nohup udp2raw -s -l 0.0.0.0:8389 -r 127.0.0.1:8388 -k "Shadow2024" --raw-mode faketcp -a > /dev/null 2>&1 &
-        echo "[✓] UDP2RAW active on port 8389"
-    fi
-}
-stop() {
-    pkill -f udpspeeder 2>/dev/null
-    pkill -f udp2raw 2>/dev/null
-    echo "[✓] Booster stopped"
-}
-case "$1" in
-    start) start ;;
-    stop) stop ;;
-    restart) stop; sleep 1; start ;;
-    *) echo "Usage: shadow-booster {start|stop|restart}" ;;
-esac
-BOOSTER
-chmod +x /usr/local/bin/shadow-booster
 systemctl daemon-reload
-systemctl enable shadow-booster
-systemctl start shadow-booster
-echo -e "${GREEN}[✓] Booster service active${NC}"
+systemctl enable ssh-booster.service
+systemctl start ssh-booster.service
 
-# ============ FIREWALL ============
-echo -e "${YELLOW}[5/6] Configuring Firewall...${NC}"
-iptables -A INPUT -p udp --dport 8388 -j ACCEPT 2>/dev/null
-iptables -A INPUT -p tcp --dport 8389 -j ACCEPT 2>/dev/null
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null
-echo -e "${GREEN}[✓] Firewall rules applied${NC}"
+# INSTALL WEB PANEL (ON DOMAIN IF PROVIDED)
+echo -e "${GREEN}🌐 Installing Web Panel on $PANEL_DOMAIN...${NC}"
+apt install -y nginx python3-pip
+pip3 install flask gunicorn
 
-# ============ MAIN PANEL ============
-echo -e "${YELLOW}[6/6] Installing Shadow Panel...${NC}"
-cat > /usr/local/bin/shadow-panel << 'PANEL'
-#!/bin/bash
-RED="\033[1;31m"; GREEN="\033[1;32m"; YELLOW="\033[1;33m"; BLUE="\033[1;34m"; CYAN="\033[1;36m"; MAGENTA="\033[1;35m"; NC="\033[0m"
+mkdir -p /var/www/ssh-panel
+cat > /var/www/ssh-panel/app.py << 'EOF'
+from flask import Flask, request, jsonify, render_template_string
+import subprocess, sqlite3, time, json, os
 
-# Get IPv4 only
-get_ipv4() {
-    IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null || curl -s -4 api.ipify.org 2>/dev/null)
-    if [[ -z "$IP" ]]; then
-        IP=$(hostname -I | awk '{print $1}')
-    fi
-    echo "$IP"
+app = Flask(__name__)
+DB = '/var/www/ssh-panel/users.db'
+
+if not os.path.exists(DB):
+    conn = sqlite3.connect(DB)
+    conn.execute('CREATE TABLE users (username TEXT, password TEXT, traffic_limit INT, expiry INT, used INT)')
+    conn.close()
+
+HTML = '''
+<!DOCTYPE html>
+<html><head><title>Shadow SSH Panel</title></head>
+<body><h1>🚀 SSH Account Manager</h1>
+<form method="post" action="/create">
+    User: <input name="user"><br>
+    Pass: <input name="pass" type="password"><br>
+    Traffic (GB): <input name="traffic"><br>
+    Days valid: <input name="days"><br>
+    <input type="submit" value="Create">
+</form>
+</body></html>
+'''
+
+@app.route('/')
+def index():
+    return render_template_string(HTML)
+
+@app.route('/create', methods=['POST'])
+def create():
+    user = request.form['user']
+    pwd = request.form['pass']
+    traffic_gb = int(request.form['traffic'])
+    days = int(request.form['days'])
+    expiry = int(time.time()) + days * 86400
+    conn = sqlite3.connect(DB)
+    conn.execute('INSERT INTO users VALUES (?,?,?,?,0)', (user, pwd, traffic_gb*1024, expiry))
+    conn.commit()
+    conn.close()
+    subprocess.run(f"useradd -M -s /bin/false {user} && echo '{user}:{pwd}' | chpasswd", shell=True)
+    return f"✅ User {user} created. Server: {request.host}"
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=5000)
+EOF
+
+cat > /etc/systemd/system/ssh-panel.service << EOF
+[Unit]
+Description=SSH Panel
+After=network.target
+[Service]
+ExecStart=gunicorn --bind 127.0.0.1:5000 app:app
+WorkingDirectory=/var/www/ssh-panel
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable ssh-panel
+systemctl start ssh-panel
+
+# NGINX WITH DOMAIN (OR IP)
+if [ "$DOMAIN_MODE" = true ]; then
+    cat > /etc/nginx/sites-available/ssh-panel << EOF
+server {
+    listen 80;
+    server_name $PANEL_DOMAIN;
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host \$host;
+    }
 }
-
-IP=$(get_ipv4)
-
-show_header() {
-    clear
-    echo -e "${CYAN}========================================${NC}"
-    echo -e "${MAGENTA}        SHADOW SSH v2.0 PANEL${NC}"
-    echo -e "${CYAN}========================================${NC}"
-    echo -e "${GREEN} Server IPv4:${NC} $IP"
-    echo -e "${GREEN} Shadow Port:${NC} 8388 (UDP Accelerated)"
-    echo -e "${GREEN} Regular Port:${NC} 22"
-    echo -e "${GREEN} Booster:${NC} Active"
-    echo -e "${CYAN}========================================${NC}"
+EOF
+else
+    cat > /etc/nginx/sites-available/ssh-panel << EOF
+server {
+    listen 80;
+    server_name _;
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host \$host;
+    }
 }
+EOF
+fi
 
-list_users() {
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${YELLOW}Existing users:${NC}"
-    if [ "$(ls /home 2>/dev/null)" ]; then
-        for user in $(ls /home 2>/dev/null); do
-            exp=$(chage -l "$user" 2>/dev/null | grep "Account expires" | cut -d: -f2)
-            echo -e "  ${GREEN}▶${NC} $user - Expires: $exp"
-        done
-    else
-        echo -e "  ${RED}No users found${NC}"
-    fi
-    echo -e "${GREEN}========================================${NC}"
-}
+ln -sf /etc/nginx/sites-available/ssh-panel /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
 
-delete_user() {
-    echo -e "${GREEN}========================================${NC}"
-    list_users
-    read -p "Username to delete: " u
-    if ! id "$u" &>/dev/null; then
-        echo -e "${RED}User not found!${NC}"
-        return
-    fi
-    pkill -u "$u" 2>/dev/null
-    iptables -D OUTPUT -m owner --uid-owner $(id -u "$u") -j "${u}_limit" 2>/dev/null
-    iptables -F "${u}_limit" 2>/dev/null
-    iptables -X "${u}_limit" 2>/dev/null
-    userdel -r "$u" 2>/dev/null
-    echo -e "${GREEN}[✓] User $u deleted${NC}"
-}
-
-create_user() {
-    echo -e "${GREEN}========================================${NC}"
-    read -p "Username: " u
-    if id "$u" &>/dev/null; then
-        echo -e "${RED}User exists!${NC}"
-        return
-    fi
-    read -p "Password (Enter=auto): " p
-    if [ -z "$p" ]; then
-        p=$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-10)
-        echo -e "${YELLOW}Auto password: $p${NC}"
-    fi
-    read -p "Limit GB (0=unlimited): " l
-    read -p "Days (0=unlimited): " d
-    
-    if [ "$d" != "0" ] && [ "$d" -gt 0 ]; then
-        exp=$(date -d "+${d} days" +%Y-%m-%d)
-        useradd -m -s /bin/bash -e "$exp" "$u"
-        echo -e "${GREEN}[✓] User created with expiry: $exp${NC}"
-    else
-        useradd -m -s /bin/bash "$u"
-        echo -e "${GREEN}[✓] User created (no expiry)${NC}"
-    fi
-    
-    echo "$u:$p" | chpasswd
-    usermod -aG sudo "$u" 2>/dev/null
-    
-    if [ "$l" != "0" ] && [ "$l" -gt 0 ]; then
-        quota=$((l * 1073741824))
-        iptables -N "${u}_limit" 2>/dev/null
-        iptables -F "${u}_limit" 2>/dev/null
-        iptables -A "${u}_limit" -m quota --quota "$quota" -j ACCEPT
-        iptables -A "${u}_limit" -j DROP
-        iptables -I OUTPUT -m owner --uid-owner $(id -u "$u") -j "${u}_limit"
-        echo -e "${GREEN}[✓] Traffic limit: ${l}GB${NC}"
-    fi
-    
-    # Refresh IPv4
-    IP=$(get_ipv4)
-    
-    # Regular config (Port 22)
-    json1="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"${u}-regular\",\"sshHost\":\"$IP\",\"sshPort\":22,\"sshUsername\":\"$u\",\"sshPassword\":\"$p\",\"udpgwTransparentDNS\":true}"
-    enc1=$(echo -n "$json1" | base64 -w 0)
-    
-    # Shadow config (Port 8388)
-    json2="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"${u}-shadow\",\"sshHost\":\"$IP\",\"sshPort\":8388,\"sshUsername\":\"$u\",\"sshPassword\":\"$p\",\"udpgwTransparentDNS\":true}"
-    enc2=$(echo -n "$json2" | base64 -w 0)
-    
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}[✓] USER CREATED SUCCESSFULLY${NC}"
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${YELLOW}Username:${NC} $u"
-    echo -e "${YELLOW}Password:${NC} $p"
-    [ "$d" != "0" ] && [ "$d" -gt 0 ] && echo -e "${YELLOW}Expiry:${NC} +${d} days"
-    [ "$l" != "0" ] && [ "$l" -gt 0 ] && echo -e "${YELLOW}Limit:${NC} ${l}GB"
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${BLUE}[Regular SSH - Port 22]:${NC}"
-    echo -e "${CYAN}npvt-ssh://$enc1${NC}"
-    echo -e "${MAGENTA}[Shadow SSH - Port 8388 - Ultra Speed]:${NC}"
-    echo -e "${CYAN}npvt-ssh://$enc2${NC}"
-    echo -e "${GREEN}========================================${NC}"
-    
-    # Save to file
-    echo "npvt-ssh://$enc1" > "/root/${u}_regular.txt"
-    echo "npvt-ssh://$enc2" > "/root/${u}_shadow.txt"
-    echo -e "${YELLOW}Links saved in /root/${u}_regular.txt and /root/${u}_shadow.txt${NC}"
-}
-
-show_usage() {
-    echo -e "${GREEN}========================================${NC}"
-    read -p "Username: " u
-    if ! id "$u" &>/dev/null; then
-        echo -e "${RED}User not found!${NC}"
-        return
-    fi
-    exp=$(chage -l "$u" 2>/dev/null | grep "Account expires" | cut -d: -f2)
-    echo -e "${GREEN}User: $u${NC}"
-    echo -e "Expires: $exp"
-    
-    # Check traffic usage
-    if iptables -L "${u}_limit" -v -n 2>/dev/null | grep -q "quota"; then
-        used=$(iptables -L "${u}_limit" -v -n 2>/dev/null | grep "quota" | awk '{print $2}')
-        limit=$(iptables -L "${u}_limit" -v -n 2>/dev/null | grep "quota" | sed -n 's/.*quota \([0-9]*\).*/\1/p')
-        if [[ -n "$used" && -n "$limit" ]]; then
-            used_gb=$((used / 1073741824))
-            limit_gb=$((limit / 1073741824))
-            echo -e "Traffic: ${used_gb}GB / ${limit_gb}GB"
-        fi
-    fi
-    echo -e "${GREEN}========================================${NC}"
-}
-
-# Main menu
-while true; do
-    show_header
-    echo -e "1) ${GREEN}Create New Config${NC}"
-    echo -e "2) ${YELLOW}Show User Usage${NC}"
-    echo -e "3) ${CYAN}List All Users${NC}"
-    echo -e "4) ${RED}Delete User${NC}"
-    echo -e "5) ${MAGENTA}Exit${NC}"
-    echo -e "${CYAN}========================================${NC}"
-    read -p "Choose [1-5]: " choice
-    case $choice in
-        1) create_user ;;
-        2) show_usage ;;
-        3) list_users ;;
-        4) delete_user ;;
-        5) echo -e "${GREEN}Goodbye!${NC}"; exit 0 ;;
-        *) echo -e "${RED}Invalid option!${NC}" ;;
-    esac
-    echo ""
-    read -p "Press Enter to continue..."
-done
-PANEL
-
-chmod +x /usr/local/bin/shadow-panel
-
-# Create aliases
-echo "alias shadow-panel=\"/usr/local/bin/shadow-panel\"" >> ~/.bashrc
-echo "alias shadow=\"/usr/local/bin/shadow-panel\"" >> ~/.bashrc
-
-# Final message
-echo ""
-echo -e "${GREEN}========================================${NC}"
-echo -e "${MAGENTA}   ✅ SHADOW SSH v2.0 INSTALLED!${NC}"
-echo -e "${GREEN}========================================${NC}"
-echo -e "${CYAN}Server IPv4:${NC} $IP"
-echo -e "${CYAN}To run the panel, type:${NC} shadow-panel"
-echo -e "${CYAN}Shadow Port (Ultra Speed):${NC} 8388"
-echo -e "${CYAN}Regular Port:${NC} 22"
-echo -e "${GREEN}========================================${NC}"
+# FINAL OUTPUT
+clear
+echo -e "${GREEN}✅ Installation Complete!${NC}"
+echo "====================================="
+echo "🌐 Panel URL: http://$PANEL_DOMAIN"
+echo "🔌 SSH Port: 22 (Super Boosted - 5-10x faster)"
+echo "🚫 Port 8388: Removed completely"
+if [ "$DOMAIN_MODE" = true ]; then
+    echo "✅ Domain mode: Active (hides your server IP)"
+    echo "💡 Your server IP is now protected behind $PANEL_DOMAIN"
+else
+    echo "⚠️ Domain mode: Inactive (panel via IP)"
+    echo "💡 For better filtering protection, use a domain next time"
+fi
+echo "====================================="
