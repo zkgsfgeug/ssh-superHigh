@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v2.0 - NPVT VPN Format
+# Shadow SSH v2.0 - NPVT VPN (IP Default)
 # =============================================
 
 RED='\033[0;31m'
@@ -41,7 +41,9 @@ systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 
 # ایجاد فایل‌ها
 touch /etc/shadow-users.conf
-echo "arvinam.duckdns.org" > /etc/shadow-domain.conf
+
+# فایل دامنه را خالی می‌گذاریم (پیش‌فرض IP)
+echo "" > /etc/shadow-domain.conf
 
 # بهینه‌سازی کرنل
 echo -e "${YELLOW}⚡ Optimizing kernel...${NC}"
@@ -58,7 +60,7 @@ EOF
 
 sysctl -p > /dev/null 2>&1
 
-# ایجاد پنل با فرمت NPVT
+# ایجاد پنل با IP پیش‌فرض
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
 
@@ -71,21 +73,24 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# دریافت آدرس سرور (IP یا دامنه)
 get_server() {
     if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
+        # اگر دامنه تنظیم شده باشد
         cat "$DOMAIN_FILE" | head -1
     else
-        curl -s ifconfig.me
+        # پیش‌فرض: IP سرور
+        curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null
     fi
 }
 
+# تولید کانفیگ NPVT
 generate_npvt_config() {
     local username=$1
     local password=$2
     local server=$(get_server)
     local port="22"
     
-    # ساخت JSON برای NPVT
     local json_data=$(cat <<EOF
 {
   "sshConfigType": "SSH-Direct",
@@ -98,7 +103,6 @@ generate_npvt_config() {
 }
 EOF
 )
-    # تبدیل به Base64
     local config_b64=$(echo -n "$json_data" | base64 -w 0)
     echo "npvt-ssh://${config_b64}"
 }
@@ -109,14 +113,15 @@ show_menu() {
     echo -e "${GREEN}       🚀 SHADOW SSH - NPVT VPN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
-    echo -e "   ${YELLOW}Port 8388:${NC} ${RED}REMOVED${NC}"
+    echo -e "   ${RED}Port 8388:${NC} ${RED}REMOVED${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "   ${YELLOW}1${NC}) Create User + NPVT Config"
     echo -e "   ${YELLOW}2${NC}) List Users"
     echo -e "   ${YELLOW}3${NC}) Show Config"
     echo -e "   ${YELLOW}4${NC}) Delete User"
-    echo -e "   ${YELLOW}5${NC}) Change Domain"
-    echo -e "   ${YELLOW}6${NC}) Exit"
+    echo -e "   ${GREEN}5${NC}) Set Domain (Hide IP)"
+    echo -e "   ${YELLOW}6${NC}) Remove Domain (Back to IP)"
+    echo -e "   ${YELLOW}7${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
 
@@ -152,7 +157,6 @@ create_user() {
     useradd -M -s /bin/false "$username" 2>/dev/null
     echo "$username:$password" | chpasswd 2>/dev/null
     
-    # تولید کانفیگ NPVT
     local npvt_config=$(generate_npvt_config "$username" "$password")
     
     clear
@@ -162,6 +166,12 @@ create_user() {
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${GREEN}${npvt_config}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    local current_server=$(get_server)
+    if [[ "$current_server" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "${YELLOW}💡 Tip: Use option 5 to set a domain and hide your IP${NC}"
+    fi
+    
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
@@ -253,25 +263,52 @@ delete_user() {
 set_domain() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}🌐 CHANGE DOMAIN${NC}"
+    echo -e "${GREEN}🌐 SET DOMAIN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}Current domain: $(get_server)${NC}"
+    echo -e "${YELLOW}Enter your domain that points to this server${NC}"
+    echo -e "${YELLOW}Example: vpn.yourdomain.com${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    echo -n "👉 New domain: "
+    echo -n "👉 Domain: "
     read domain
     
     if [ -n "$domain" ]; then
         echo "$domain" > "$DOMAIN_FILE"
-        echo -e "\n${GREEN}✅ Domain changed to: $domain${NC}"
+        echo -e "\n${GREEN}✅ Domain set to: $domain${NC}"
+        echo -e "${YELLOW}📌 From now on, configs will use this domain${NC}"
     else
         echo -e "\n${RED}❌ Invalid domain!${NC}"
     fi
     sleep 2
 }
 
+remove_domain() {
+    clear
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}🔙 REMOVE DOMAIN${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    local current_domain=$(cat "$DOMAIN_FILE" 2>/dev/null)
+    if [ -n "$current_domain" ] && [ -s "$DOMAIN_FILE" ]; then
+        echo -e "${YELLOW}Current domain: ${current_domain}${NC}"
+        echo -e "${BLUE}────────────────────────────────────────────${NC}"
+        echo -n "Remove domain and use IP instead? (y/n): "
+        read confirm
+        if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+            echo "" > "$DOMAIN_FILE"
+            local server_ip=$(curl -s ifconfig.me)
+            echo -e "\n${GREEN}✅ Domain removed! Now using IP: $server_ip${NC}"
+        else
+            echo -e "\n${YELLOW}❌ Cancelled${NC}"
+        fi
+    else
+        echo -e "\n${YELLOW}ℹ️ No domain is currently set. Already using IP.${NC}"
+    fi
+    sleep 2
+}
+
 while true; do
     show_menu
-    echo -n "👉 Choose [1-6]: "
+    echo -n "👉 Choose [1-7]: "
     read choice
     case $choice in
         1) create_user ;;
@@ -279,7 +316,8 @@ while true; do
         3) show_config ;;
         4) delete_user ;;
         5) set_domain ;;
-        6) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
+        6) remove_domain ;;
+        7) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
         *) echo -e "${RED}❌ Invalid option${NC}"; sleep 1 ;;
     esac
 done
@@ -296,7 +334,9 @@ echo -e "${GREEN}═════════════════════
 echo -e "${YELLOW}📊 Features:${NC}"
 echo -e "   • Port 8388: ${RED}REMOVED${NC}"
 echo -e "   • SSH Port:  ${GREEN}22 (Super Boosted)${NC}"
-echo -e "   • Domain:    ${GREEN}arvinam.duckdns.org${NC}"
+echo -e "   • Default:   ${GREEN}IP Mode (Your server IP)${NC}"
+echo -e "   • Option 5:  ${GREEN}Set Domain (Hide IP)${NC}"
+echo -e "   • Option 6:  ${GREEN}Remove Domain (Back to IP)${NC}"
 echo -e "   • Output:    ${GREEN}npvt-ssh:// format${NC}"
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
