@@ -46,7 +46,7 @@
 ## 🚀 دستور نصب | Installation Command
 
 یک خط دستور زیر را در سرور خود کپی و اجرا کنید:
-
+##دستور نصب پنل
 ```bash
 curl -s https://raw.githubusercontent.com/zkgsfgeug/ssh-superHigh/main/install.sh | bash
 
