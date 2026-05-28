@@ -53,6 +53,4 @@ curl -s https://raw.githubusercontent.com/zkgsfgeug/ssh-superHigh/main/install.s
 ---
 
 ## 🚀 دستور اجرای پنل و ورود به پنل مدیریت
-```bash
 shadow-panel
- این 2 تا دستورات زیر چرا کادر هاشون جدا نشده درستش کن و کاملشو بفرست
