@@ -43,7 +43,7 @@
 
 ---
 
-## 🚀 دستور نصب | Installation Command
+## 🚀 دستور نصب | Installation Command## 🚀 دستور نصب | Installation Command
 
 یک خط دستور زیر را در سرور خود کپی و اجرا کنید:
 
