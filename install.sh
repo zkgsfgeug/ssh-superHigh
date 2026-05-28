@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v2.0 - Dynamic FEC Ratio Edition
-# Features: Manual Ratio Control (2 to 100)
+# Shadow SSH v2.0 - Fixed NPVT Config
 # =============================================
 
 RED='\033[0;31m'
@@ -12,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH - Dynamic FEC Ratio Installer${NC}"
+echo -e "${GREEN}   Shadow SSH - Fixed NPVT Installer${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 if [[ $EUID -ne 0 ]]; then
@@ -31,108 +30,21 @@ apt-get install -f -y 2>/dev/null
 # نصب پیش‌نیازها
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 apt update -y
-apt install -y curl wget coreutils openssh-server git gcc make libsodium-dev build-essential
+apt install -y curl wget coreutils openssh-server
 
 # حذف پورت 8388
-echo -e "${YELLOW}🚫 Removing port 8388...${NC}"
 sed -i '/Port 8388/d' /etc/ssh/sshd_config 2>/dev/null
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 
-# ایجاد فایل‌های کانفیگ
+# ایجاد فایل‌ها
 touch /etc/shadow-users.conf
 echo "" > /etc/shadow-domain.conf
-echo "0" > /etc/shadow-fec.conf  # 0 = Disabled, otherwise stores the ratio
+echo "0" > /etc/shadow-fec.conf
 
-# =============================================
-# نصب UDPspeeder + udp2raw
-# =============================================
-echo -e "${YELLOW}⚡ Installing UDP Boosters...${NC}"
+# گرفتن IP سرور برای استفاده در کانفیگ
+SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null)
 
-cd /root
-git clone https://github.com/wangyu-/UDPspeeder.git
-cd UDPspeeder && make && make install && cd ..
-
-git clone https://github.com/wangyu-/udp2raw-tunnel.git
-cd udp2raw-tunnel && make && make install && cd ..
-
-rm -rf /root/UDPspeeder /root/udp2raw-tunnel
-
-# =============================================
-# تابع به‌روزرسانی سرویس بر اساس ضریب
-# =============================================
-update_booster_service() {
-    local ratio=$(cat /etc/shadow-fec.conf)
-    local service_file="/etc/systemd/system/ssh-booster.service"
-    
-    systemctl stop ssh-booster 2>/dev/null
-    
-    if [ "$ratio" == "0" ] || [ -z "$ratio" ]; then
-        # حالت غیرفعال: فقط SSH معمولی
-        cat > $service_file << 'EOF'
-[Unit]
-Description=SSH Standard (No Booster)
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/bin/bash -c 'sleep infinity'
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-        echo -e "${YELLOW}🔴 Booster is DISABLED${NC}"
-    else
-        # حالت فعال: با ضریب انتخابی
-        cat > $service_file << EOF
-[Unit]
-Description=SSH Port 22 Booster - FEC ${ratio}:10
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/bin/bash -c 'UDPspeeder -s -l 0.0.0.0:8389 -r 127.0.0.1:22 -k "ShadowSecretKey2024" --timeout 1 -f ${ratio}:10 -q 1 2>/dev/null & sleep 2 && udp2raw -s -l 0.0.0.0:4096 -r 127.0.0.1:8389 -k "ShadowSecretKey2024" --raw-mode faketcp -a 2>/dev/null'
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-        echo -e "${GREEN}✅ Booster Enabled with Ratio ${ratio}:10${NC}"
-    fi
-    
-    systemctl daemon-reload
-    systemctl enable ssh-booster
-    systemctl start ssh-booster
-}
-
-# =============================================
-# بهینه‌سازی کرنل
-# =============================================
-echo -e "${YELLOW}⚡ Optimizing kernel...${NC}"
-cat >> /etc/sysctl.conf << 'EOF'
-
-# Shadow SSH Ultimate
-net.core.rmem_max = 268435456
-net.core.wmem_max = 268435456
-net.ipv4.tcp_rmem = 4096 87380 268435456
-net.ipv4.tcp_wmem = 4096 65536 268435456
-net.core.netdev_max_backlog = 100000
-net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_congestion_control = bbr
-net.core.default_qdisc = fq
-net.ipv4.tcp_fastopen = 3
-EOF
-sysctl -p > /dev/null 2>&1
-
-# تنظیم پیش‌فرض (غیرفعال)
-update_booster_service
-
-# =============================================
-# پنل مدیریت با گزینه ضریب
-# =============================================
+# پنل اصلی
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
 
@@ -146,12 +58,26 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# تابع مطمئن برای گرفتن آدرس سرور
 get_server() {
+    # اول چک کن دامنه تنظیم شده؟
     if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-        cat "$DOMAIN_FILE" | head -1
-    else
-        curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null
+        local domain=$(cat "$DOMAIN_FILE" | head -1)
+        if [ -n "$domain" ]; then
+            echo "$domain"
+            return
+        fi
     fi
+    
+    # برو سراغ IP
+    local ip=$(curl -s -4 ifconfig.me 2>/dev/null)
+    if [ -n "$ip" ]; then
+        echo "$ip"
+        return
+    fi
+    
+    # آخرین راه: IP هاردکد شده از زمان نصب
+    echo "SERVER_IP_PLACEHOLDER"
 }
 
 get_fec_status() {
@@ -167,6 +93,14 @@ generate_npvt_config() {
     local username=$1
     local password=$2
     local server=$(get_server)
+    
+    # اگر باز هم خالی بود، از fallback استفاده کن
+    if [ -z "$server" ]; then
+        server=$(curl -s ifconfig.me)
+    fi
+    if [ -z "$server" ]; then
+        server="SERVER_IP_PLACEHOLDER"
+    fi
     
     cat << EOF
 {
@@ -196,8 +130,8 @@ show_menu() {
     echo -e "   ${YELLOW}4${NC}) Delete User"
     echo -e "   ${GREEN}5${NC}) Set Domain (Hide IP)"
     echo -e "   ${YELLOW}6${NC}) Remove Domain (Back to IP)"
-    echo -e "   ${CYAN}7${NC}) Set FEC Ratio (2-100) ⚡"
-    echo -e "   ${RED}8${NC}) Disable FEC Booster 🛑"
+    echo -e "   ${CYAN}7${NC}) Set FEC Ratio (2-100)"
+    echo -e "   ${RED}8${NC}) Disable FEC Booster"
     echo -e "   ${YELLOW}9${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
@@ -239,6 +173,14 @@ create_user() {
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${GREEN}${npvt_config}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    # نمایش اطلاعات به صورت خام برای اطمینان
+    echo -e "\n${YELLOW}📋 Connection Details:${NC}"
+    echo -e "   Server: $(get_server)"
+    echo -e "   Port: 22"
+    echo -e "   Username: $username"
+    echo -e "   Password: $password"
+    
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
@@ -349,25 +291,18 @@ set_fec_ratio() {
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "${GREEN}⚡ SET FEC RATIO${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}Enter a ratio between 2 and 100${NC}"
-    echo -e "${YELLOW}Example: 25 means 25:10 (2.5x speed boost)${NC}"
-    echo -e "${YELLOW}Higher ratio = More speed but More bandwidth${NC}"
-    echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    echo -n "👉 FEC Ratio (2-100): "
+    echo -e "${YELLOW}Enter ratio (2-100) | Example: 25 = 2.5x speed${NC}"
+    echo -n "👉 Ratio: "
     read ratio
     
     if [[ "$ratio" =~ ^[0-9]+$ ]] && [ "$ratio" -ge 2 ] && [ "$ratio" -le 100 ]; then
         echo "$ratio" > "$FEC_FILE"
-        echo -e "\n${GREEN}✅ FEC Ratio set to ${ratio}:10${NC}"
-        echo -e "${YELLOW}🔄 Restarting booster service...${NC}"
+        echo -e "\n${GREEN}✅ FEC set to ${ratio}:10${NC}"
         
-        # به‌روزرسانی و ریستارت سرویس
-        local service_file="/etc/systemd/system/ssh-booster.service"
-        systemctl stop ssh-booster
-        
-        cat > $service_file << EOF
+        # به‌روزرسانی سرویس
+        cat > /etc/systemd/system/ssh-booster.service << EOF
 [Unit]
-Description=SSH Port 22 Booster - FEC ${ratio}:10
+Description=SSH Booster - FEC ${ratio}:10
 After=network.target
 
 [Service]
@@ -379,14 +314,11 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
-        
         systemctl daemon-reload
-        systemctl enable ssh-booster
-        systemctl start ssh-booster
-        
-        echo -e "${GREEN}✅ Booster restarted with new ratio!${NC}"
+        systemctl enable ssh-booster 2>/dev/null
+        systemctl restart ssh-booster 2>/dev/null
     else
-        echo -e "\n${RED}❌ Invalid ratio! Must be between 2 and 100.${NC}"
+        echo -e "\n${RED}❌ Invalid! Must be 2-100${NC}"
     fi
     sleep 2
 }
@@ -394,22 +326,18 @@ EOF
 disable_fec() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${RED}🛑 DISABLE FEC BOOSTER${NC}"
+    echo -e "${RED}🛑 DISABLE FEC${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -n "Are you sure? (y/n): "
+    echo -n "Confirm? (y/n): "
     read confirm
     
     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
         echo "0" > "$FEC_FILE"
-        
-        # غیرفعال کردن سرویس
-        systemctl stop ssh-booster
-        systemctl disable ssh-booster
-        
-        echo -e "\n${GREEN}✅ FEC Booster disabled!${NC}"
-        echo -e "${YELLOW}SSH is now running in standard mode (no speed boost).${NC}"
+        systemctl stop ssh-booster 2>/dev/null
+        systemctl disable ssh-booster 2>/dev/null
+        echo -e "\n${GREEN}✅ FEC Disabled${NC}"
     else
-        echo -e "\n${YELLOW}❌ Cancelled${NC}"
+        echo -e "\n${YELLOW}Cancelled${NC}"
     fi
     sleep 2
 }
@@ -428,27 +356,22 @@ while true; do
         7) set_fec_ratio ;;
         8) disable_fec ;;
         9) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
-        *) echo -e "${RED}❌ Invalid option${NC}"; sleep 1 ;;
+        *) echo -e "${RED}❌ Invalid${NC}"; sleep 1 ;;
     esac
 done
 INNEREOF
 
+# جایگزینی placeholder با IP واقعی
+sed -i "s/SERVER_IP_PLACEHOLDER/${SERVER_IP}/g" /usr/local/bin/shadow
+
 chmod +x /usr/local/bin/shadow
 
-# تنظیم فایروال
+# باز کردن پورت
 ufw allow 22/tcp 2>/dev/null
-ufw allow 4096/tcp 2>/dev/null
 
 clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ INSTALLATION COMPLETE!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}📊 Features:${NC}"
-echo -e "   • Port 8388: ${RED}REMOVED${NC}"
-echo -e "   • Dynamic FEC: ${GREEN}Manual control (2-100)${NC}"
-echo -e "   • Default Mode: ${GREEN}FEC Disabled${NC}"
-echo -e "   • Option 7: ${GREEN}Set custom FEC ratio${NC}"
-echo -e "   • Option 8: ${RED}Disable FEC booster${NC}"
-echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
