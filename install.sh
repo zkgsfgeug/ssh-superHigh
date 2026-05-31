@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v16.0 - PRECISION TRAFFIC (FINAL)
+# Shadow SSH v17.0 - ULTIMATE PRECISION (FINAL)
 # =============================================
 
 RED='\033[0;31m'
@@ -11,7 +11,6 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 WHITE='\033[1;37m'
-BOLD='\033[1m'
 NC='\033[0m'
 
 if [[ $EUID -ne 0 ]]; then
@@ -116,11 +115,11 @@ setup_domain() {
     
     case $domain_choice in
         1)
-            read -p "Enter your domain (e.g., ssh.example.com): " DOMAIN
+            read -p "Enter your domain: " DOMAIN
             echo "$DOMAIN" > /etc/shadow-domain.conf
             ;;
         2)
-            read -p "Enter your domain for SSL: " DOMAIN
+            read -p "Enter your domain: " DOMAIN
             read -p "Enter your email: " EMAIL
             systemctl stop nginx 2>/dev/null
             certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" 2>/dev/null
@@ -136,7 +135,7 @@ setup_domain() {
 
 setup_domain
 
-# دیتابیس با ساختار جدید و دقیق
+# دیتابیس
 mkdir -p /var/lib/shadow
 sqlite3 /var/lib/shadow/traffic.db << 'SQLEOF'
 CREATE TABLE IF NOT EXISTS users (
@@ -166,11 +165,11 @@ CREATE TABLE IF NOT EXISTS settings (
 SQLEOF
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v16.0 - PRECISION${NC}"
+echo -e "${GREEN}   Shadow SSH v17.0 - ULTIMATE${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # ============================================
-# Traffic Monitor - بازنویسی کامل با الگوریتم دقیق
+# Traffic Monitor - فقط پروسه‌های SSH
 # ============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
@@ -188,7 +187,7 @@ fi
 echo $$ > "$PID_FILE"
 trap "rm -f $PID_FILE" EXIT
 
-# تابع خواندن ترافیک دقیق یک PID از /proc
+# تابع خواندن ترافیک از /proc
 read_pid_traffic() {
     local pid=$1
     
@@ -203,7 +202,66 @@ read_pid_traffic() {
     echo "$rx $tx"
 }
 
-echo "🔄 Precision Traffic Monitor Started (PID: $$)"
+# تشخیص پروسه SSH با بررسی درخت پروسه
+is_ssh_process() {
+    local pid=$1
+    
+    # مسیر 1: چک نام پروسه
+    local comm=$(cat /proc/$pid/comm 2>/dev/null)
+    if [ "$comm" = "sshd" ]; then
+        return 0
+    fi
+    
+    # مسیر 2: چک cmdline (بعضی پروسه‌ها sshd هستند با آرگومان)
+    local cmdline=$(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ')
+    if echo "$cmdline" | grep -q "sshd"; then
+        return 0
+    fi
+    
+    # مسیر 3: بالا رفتن از درخت والدین تا sshd
+    local current_pid=$pid
+    local depth=0
+    
+    while [ $depth -lt 10 ]; do
+        if [ ! -f "/proc/$current_pid/stat" ]; then
+            break
+        fi
+        
+        local ppid=$(cat /proc/$current_pid/stat 2>/dev/null | awk '{print $4}')
+        
+        if [ -z "$ppid" ] || [ "$ppid" = "0" ] || [ "$ppid" = "1" ]; then
+            break
+        fi
+        
+        local parent_comm=$(cat /proc/$ppid/comm 2>/dev/null)
+        
+        if [ "$parent_comm" = "sshd" ]; then
+            return 0
+        fi
+        
+        current_pid=$ppid
+        depth=$((depth + 1))
+    done
+    
+    return 1
+}
+
+# دریافت PIDهای SSH یک کاربر
+get_user_ssh_pids() {
+    local username=$1
+    local all_pids=$(pgrep -u "$username" 2>/dev/null)
+    local ssh_pids=""
+    
+    for pid in $all_pids; do
+        if is_ssh_process "$pid"; then
+            ssh_pids="$ssh_pids $pid"
+        fi
+    done
+    
+    echo "$ssh_pids"
+}
+
+echo "🔄 SSH Traffic Monitor Started (PID: $$)"
 
 while true; do
     # دریافت کاربران فعال
@@ -223,67 +281,54 @@ while true; do
             continue
         fi
         
-        # ============================================
-        # الگوریتم دقیق محاسبه ترافیک
-        # ============================================
+        # دریافت فقط PIDهای SSH کاربر
+        current_pids=$(get_user_ssh_pids "$username")
         
-        # 1. دریافت PIDهای فعلی کاربر
-        current_pids=$(pgrep -u "$username" 2>/dev/null)
+        # علامت‌گذاری PIDهای قطع شده
+        if [ -n "$current_pids" ]; then
+            pid_list=$(echo "$current_pids" | tr ' ' ',')
+            sqlite3 "$DB" "UPDATE traffic_records SET status='closed' WHERE username='$username' AND status='active' AND pid NOT IN (${pid_list});"
+        else
+            sqlite3 "$DB" "UPDATE traffic_records SET status='closed' WHERE username='$username' AND status='active';"
+        fi
         
-        # 2. علامت‌گذاری PIDهای مرده
-        sqlite3 "$DB" "UPDATE traffic_records SET status='closed' WHERE username='$username' AND status='active' AND pid NOT IN (${current_pids//$'\n'/,});"
-        
-        # 3. پردازش PIDهای فعال
+        # پردازش PIDهای فعال
         for pid in $current_pids; do
-            # خواندن ترافیک فعلی
             read -r rx_now tx_now <<< $(read_pid_traffic "$pid")
             
-            # چک وجود رکورد
             existing=$(sqlite3 "$DB" "SELECT pid FROM traffic_records WHERE pid=$pid AND status='active';")
             
             if [ -z "$existing" ]; then
-                # PID جدید - ثبت با ترافیک صفر اولیه
+                # PID جدید - ثبت基点
                 sqlite3 "$DB" "INSERT OR IGNORE INTO traffic_records (username, pid, start_time, last_rx_bytes, last_tx_bytes, accumulated_bytes, status) VALUES ('$username', $pid, $current_time, $rx_now, $tx_now, 0, 'active');"
             else
-                # PID موجود - محاسبه ترافیک جدید
+                # محاسبه ترافیک جدید
                 last_rx=$(sqlite3 "$DB" "SELECT last_rx_bytes FROM traffic_records WHERE pid=$pid AND status='active';")
                 last_tx=$(sqlite3 "$DB" "SELECT last_tx_bytes FROM traffic_records WHERE pid=$pid AND status='active';")
                 
-                # محاسبه تفاوت (ترافیک جدید)
                 diff_rx=$((rx_now - last_rx))
                 diff_tx=$((tx_now - last_tx))
                 
-                # اگر منفی شد (مثلاً restart پروسه) - فقط آپدیت基点
-                if [ $diff_rx -lt 0 ]; then
-                    diff_rx=0
-                    # ریست基点 برای این PID
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid;"
-                    continue
-                fi
-                if [ $diff_tx -lt 0 ]; then
-                    diff_tx=0
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid;"
+                # اگر基点 ریست شد (پروسه جدید جایگزین شده)
+                if [ $diff_rx -lt 0 ] || [ $diff_tx -lt 0 ]; then
+                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, start_time=$current_time, accumulated_bytes=0 WHERE pid=$pid;"
                     continue
                 fi
                 
-                # فقط اگر ترافیک جدید داریم
                 if [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ]; then
                     new_bytes=$((diff_rx + diff_tx))
                     
-                    # آپدیت رکورد
                     sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $new_bytes WHERE pid=$pid;"
-                    
-                    # آپدیت مصرف کل کاربر
                     sqlite3 "$DB" "UPDATE users SET used_traffic = used_traffic + $new_bytes WHERE username='$username';"
                 fi
             fi
         done
         
-        # 4. بروزرسانی مصرف کل کاربر از مجموع همه رکوردها (برای اطمینان)
+        # بروزرسانی مصرف کل از مجموع رکوردها
         total_usage=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');")
         sqlite3 "$DB" "UPDATE users SET used_traffic = $total_usage WHERE username='$username';"
         
-        # 5. چک محدودیت حجم
+        # چک محدودیت حجم
         total_limit=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$username';")
         
         if [ "$total_limit" != "0" ] && [ "$total_usage" -ge "$total_limit" ]; then
@@ -345,14 +390,6 @@ def get_domain():
                 return domain
     return subprocess.getoutput("curl -s ifconfig.me")
 
-def format_bytes(bytes_val):
-    if bytes_val == 0:
-        return "0 MB"
-    mb = bytes_val / 1048576.0
-    if mb >= 1024:
-        return f"{mb/1024:.2f} GB"
-    return f"{mb:.2f} MB"
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("❌ Unauthorized!")
@@ -373,7 +410,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "🔱 *Shadow SSH Manager v16.0*\n"
+        "🔱 *Shadow SSH Manager v17.0*\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"🌐 Server: `{get_domain()}`\n"
         f"📡 Port: `22`\n"
@@ -672,7 +709,7 @@ BOTEOF
 chmod +x /usr/local/bin/shadow-bot
 
 # ============================================
-# Main Shadow Manager با محاسبه دقیق
+# Main Shadow Manager
 # ============================================
 cat > /usr/local/bin/shadow << 'MAINEOF'
 #!/bin/bash
@@ -706,10 +743,10 @@ get_user_usage() {
 show_banner() {
     SERVER_IP=$(get_domain)
     echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║        ${GREEN}🔱 SHADOW SSH v16.0 PRECISION 🔱${PURPLE}        ║${NC}"
+    echo -e "${PURPLE}║        ${GREEN}🔱 SHADOW SSH v17.0 ULTIMATE 🔱${PURPLE}         ║${NC}"
     echo -e "${PURPLE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${PURPLE}║${NC}  🌐 Server: ${GREEN}${SERVER_IP}${NC}"
-    echo -e "${PURPLE}║${NC}  📡 Port: ${GREEN}22${NC}  |  ⚡ BBR: ${GREEN}ON${NC}"
+    echo -e "${PURPLE}║${NC}  📡 Port: ${GREEN}22${NC}  |  ⚡ BBR: ${GREEN}ON${NC}  |  🎯 Precision${NC}"
     echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
 }
 
@@ -755,8 +792,7 @@ create_user() {
     echo "$username:$password" | chpasswd
     
     cat > "/etc/ssh/sshd_config.d/${username}.conf" << EOF
-MaxSessions $max_conn
-MaxStartups $max_conn
+MaxSessions $max_connMaxStartups $max_conn
 EOF
     
     echo "$username" >> /etc/shadow-users.conf 2>/dev/null
@@ -822,10 +858,7 @@ list_users() {
     while IFS='|' read -r username status total_limit expiry limit; do
         [ -z "$username" ] && continue
         
-        # خواندن دقیق مصرف از جدول traffic_records
         used=$(get_user_usage "$username")
-        
-        # آپدیت در جدول users
         sqlite3 "$DB" "UPDATE users SET used_traffic = $used WHERE username='$username';"
         
         used_mb=$(echo "scale=2; $used / 1048576" | bc 2>/dev/null || echo "0")
@@ -864,7 +897,7 @@ view_traffic() {
     echo -e "\n${YELLOW}📊 TRAFFIC DETAIL${NC}"
     read -p "Username: " username
     
-    echo -e "\n${CYAN}Traffic Records for ${username}${NC}"
+    echo -e "\n${CYAN}SSH Traffic Records for ${username}${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${WHITE}Start Time              | PID    | Status  | Traffic${NC}"
     echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
@@ -874,11 +907,10 @@ view_traffic() {
         printf "%-24s | %-6s | %-7s | %sMB\n" "$time" "$pid" "$status" "$mb"
     done
     
-    # نمایش جمع کل
     total=$(get_user_usage "$username")
     total_mb=$(echo "scale=2; $total / 1048576" | bc 2>/dev/null || echo "0")
     echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}Total: ${total_mb}MB${NC}"
+    echo -e "${GREEN}Total (Only SSH): ${total_mb}MB${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     read -p "Press Enter to continue..."
 }
@@ -899,13 +931,13 @@ bot_settings() {
         echo -e "${GREEN}2.${NC} Add Admin ID"
         echo -e "${GREEN}3.${NC} Start/Stop Bot"
         echo -e "${GREEN}4.${NC} View Bot Status"
-        echo -e "${GREEN}5.${NC} Back to Main Menu"
+        echo -e "${GREEN}5.${NC} Back"
         
         read -p "Select: " bot_choice
         
         case $bot_choice in
             1)
-                read -p "Enter Bot Token (from @BotFather): " token
+                read -p "Enter Bot Token: " token
                 if [ -f "$BOT_CONFIG" ]; then
                     sed -i "s/TOKEN=.*/TOKEN=$token/" "$BOT_CONFIG"
                 else
@@ -916,7 +948,7 @@ bot_settings() {
                 systemctl restart shadow-bot 2>/dev/null
                 ;;
             2)
-                read -p "Enter Admin Telegram ID: " admin_id
+                read -p "Enter Admin ID: " admin_id
                 if [ -f "$BOT_CONFIG" ]; then
                     current=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
                     new="${current},${admin_id}"
@@ -1002,6 +1034,7 @@ server_status() {
     echo -e "${WHITE}👥 Active Users:${NC} ${GREEN}${users_count}${NC}"
     echo -e "${WHITE}📡 Port 22:${NC} ${GREEN}Open${NC}"
     echo -e "${WHITE}⚡ BBR:${NC} ${GREEN}Enabled${NC}"
+    echo -e "${WHITE}🎯 Tracking:${NC} ${GREEN}SSH Only${NC}"
     
     if systemctl is-active --quiet traffic-monitor; then
         echo -e "${WHITE}📊 Monitor:${NC} ${GREEN}Running${NC}"
@@ -1018,7 +1051,6 @@ server_status() {
     read -p "Press Enter to continue..."
 }
 
-# Main loop
 while true; do
     show_menu
     read -p "Select option [1-9]: " choice
@@ -1088,26 +1120,22 @@ systemctl enable traffic-monitor shadow-bot
 systemctl start traffic-monitor
 
 mkdir -p /etc/ssh/sshd_config.d
-
 ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
 
 # ============================================
-# پایان نصب
+# پایان
 # ============================================
 clear
 echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║      ${GREEN}✅ SHADOW SSH v16.0 PRECISION!${PURPLE}            ║${NC}"
+echo -e "${PURPLE}║      ${GREEN}✅ SHADOW SSH v17.0 INSTALLED!${PURPLE}             ║${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${CYAN}📋 COMMANDS:${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}shadow${NC}           - Open Main Panel"
+echo -e "${CYAN}🎯 KEY FEATURES:${NC}"
+echo -e "${GREEN}✅ Only SSH traffic counted (precision)${NC}"
+echo -e "${GREEN}✅ Parent process tree verification${NC}"
+echo -e "${GREEN}✅ Auto basepoint reset for new sessions${NC}"
+echo -e "${GREEN}✅ Telegram bot with full management${NC}"
+echo -e "${GREEN}✅ Auto disconnect on limit/expiry${NC}"
 echo ""
-echo -e "${CYAN}🔧 KEY FEATURES:${NC}"
-echo -e "✅ Precise traffic tracking (no double counting)"
-echo -e "✅ PID-based session monitoring"
-echo -e "✅ Auto disconnect on limit reached"
-echo -e "✅ Telegram bot with full control"
-echo -e "✅ NP VT config generator"
-echo ""
+echo -e "${CYAN}🚀 Run:${NC} ${YELLOW}shadow${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
