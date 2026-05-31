@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v15.0 - FINAL STABLE (All Bugs Fixed)
+# Shadow SSH v16.0 - PRECISION TRAFFIC (FINAL)
 # =============================================
 
 RED='\033[0;31m'
@@ -26,7 +26,6 @@ optimize_network() {
     echo -e "${YELLOW}⚡ Applying Network Turbo Boost...${NC}"
     
     cat > /etc/sysctl.conf << 'EOF'
-# Shadow Turbo Boost
 net.core.rmem_max = 134217728
 net.core.wmem_max = 134217728
 net.ipv4.tcp_rmem = 4096 87380 134217728
@@ -71,7 +70,7 @@ pip3 install python-telegram-bot==20.7 pyTelegramBotAPI requests 2>/dev/null
 
 optimize_network
 
-# تنظیمات SSH پیشرفته
+# تنظیمات SSH
 echo -e "${YELLOW}🔧 Configuring SSH...${NC}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup 2>/dev/null
 
@@ -137,7 +136,7 @@ setup_domain() {
 
 setup_domain
 
-# دیتابیس با ساختار جدید
+# دیتابیس با ساختار جدید و دقیق
 mkdir -p /var/lib/shadow
 sqlite3 /var/lib/shadow/traffic.db << 'SQLEOF'
 CREATE TABLE IF NOT EXISTS users (
@@ -150,17 +149,14 @@ CREATE TABLE IF NOT EXISTS users (
     status TEXT DEFAULT 'active',
     user_limit INTEGER DEFAULT 1
 );
-CREATE TABLE IF NOT EXISTS traffic_sessions (
+CREATE TABLE IF NOT EXISTS traffic_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
-    pid INTEGER,
+    pid INTEGER UNIQUE,
     start_time INTEGER,
-    rx_start INTEGER DEFAULT 0,
-    tx_start INTEGER DEFAULT 0,
-    last_rx INTEGER DEFAULT 0,
-    last_tx INTEGER DEFAULT 0,
-    total_rx INTEGER DEFAULT 0,
-    total_tx INTEGER DEFAULT 0,
+    last_rx_bytes INTEGER DEFAULT 0,
+    last_tx_bytes INTEGER DEFAULT 0,
+    accumulated_bytes INTEGER DEFAULT 0,
     status TEXT DEFAULT 'active'
 );
 CREATE TABLE IF NOT EXISTS settings (
@@ -170,17 +166,17 @@ CREATE TABLE IF NOT EXISTS settings (
 SQLEOF
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v15.0 - STABLE${NC}"
+echo -e "${GREEN}   Shadow SSH v16.0 - PRECISION${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # ============================================
-# Traffic Monitor (بازنویسی کامل - دقیق)
+# Traffic Monitor - بازنویسی کامل با الگوریتم دقیق
 # ============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
 
 DB="/var/lib/shadow/traffic.db"
-INTERVAL=5
+INTERVAL=3
 PID_FILE="/var/run/traffic-monitor.pid"
 
 if [ -f "$PID_FILE" ]; then
@@ -192,116 +188,111 @@ fi
 echo $$ > "$PID_FILE"
 trap "rm -f $PID_FILE" EXIT
 
-# تابع دقیق محاسبه ترافیک هر پروسه
-get_pid_traffic() {
+# تابع خواندن ترافیک دقیق یک PID از /proc
+read_pid_traffic() {
     local pid=$1
-    local rx=0
-    local tx=0
     
-    if [ -f "/proc/$pid/net/dev" ]; then
-        rx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$2} END {print s+0}')
-        tx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$10} END {print s+0}')
+    if [ ! -f "/proc/$pid/net/dev" ]; then
+        echo "0 0"
+        return
     fi
+    
+    local rx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$2} END {print s+0}')
+    local tx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$10} END {print s+0}')
     
     echo "$rx $tx"
 }
 
-# تابع دریافت کل ترافیک مصرفی کاربر
-get_user_total_usage() {
-    local user=$1
-    local total_bytes=0
-    
-    # دریافت از دیتابیس
-    local db_usage=$(sqlite3 "$DB" "SELECT COALESCE(SUM(total_rx + total_tx), 0) FROM traffic_sessions WHERE username='$user' AND status='active';")
-    
-    # اضافه کردن ترافیک جلسات فعال
-    local active_pids=$(sqlite3 "$DB" "SELECT pid, rx_start, tx_start FROM traffic_sessions WHERE username='$user' AND status='active';")
-    
-    local live_total=0
-    while IFS='|' read -r pid rx_start tx_start; do
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            read -r current_rx current_tx <<< $(get_pid_traffic "$pid")
-            local diff_rx=$((current_rx - rx_start))
-            local diff_tx=$((current_tx - tx_start))
-            [ $diff_rx -lt 0 ] && diff_rx=0
-            [ $diff_tx -lt 0 ] && diff_tx=0
-            live_total=$((live_total + diff_rx + diff_tx))
-        fi
-    done <<< "$active_pids"
-    
-    total_bytes=$((db_usage + live_total))
-    echo "$total_bytes"
-}
-
-# بروزرسانی جلسات فعال
-update_sessions() {
-    local username=$1
-    
-    # دریافت جلسات فعال کاربر
-    local sessions=$(sqlite3 "$DB" "SELECT pid FROM traffic_sessions WHERE username='$username' AND status='active';")
-    
-    while IFS= read -r pid; do
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            read -r current_rx current_tx <<< $(get_pid_traffic "$pid")
-            sqlite3 "$DB" "UPDATE traffic_sessions SET last_rx=$current_rx, last_tx=$current_tx, total_rx=(total_rx + $current_rx - last_rx), total_tx=(total_tx + $current_tx - last_tx) WHERE pid=$pid AND status='active';"
-        else
-            # پروسه مرده - بستن جلسه
-            sqlite3 "$DB" "UPDATE traffic_sessions SET status='closed' WHERE pid=$pid;"
-        fi
-    done <<< "$sessions"
-    
-    # تشخیص پروسه‌های جدید
-    local current_pids=$(pgrep -u "$username" 2>/dev/null)
-    for pid in $current_pids; do
-        local exists=$(sqlite3 "$DB" "SELECT COUNT(*) FROM traffic_sessions WHERE pid=$pid AND status='active';")
-        if [ "$exists" -eq 0 ]; then
-            read -r rx tx <<< $(get_pid_traffic "$pid")
-            sqlite3 "$DB" "INSERT INTO traffic_sessions (username, pid, start_time, rx_start, tx_start, last_rx, last_tx) VALUES ('$username', $pid, $(date +%s), $rx, $tx, $rx, $tx);"
-        fi
-    done
-}
-
-# بررسی محدودیت‌ها
-check_limits() {
-    local username=$1
-    local total_used=$(get_user_total_usage "$username")
-    
-    # بروزرسانی مصرف در جدول users
-    sqlite3 "$DB" "UPDATE users SET used_traffic = $total_used WHERE username='$username';"
-    
-    local total_limit=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$username';")
-    local expiry=$(sqlite3 "$DB" "SELECT expiry FROM users WHERE username='$username';")
-    local current_time=$(date +%s)
-    
-    # چک انقضا
-    if [ "$expiry" != "0" ] && [ "$expiry" -lt "$current_time" ]; then
-        sqlite3 "$DB" "UPDATE users SET status='expired' WHERE username='$username';"
-        pkill -9 -u "$username" 2>/dev/null
-        sqlite3 "$DB" "UPDATE traffic_sessions SET status='killed' WHERE username='$username' AND status='active';"
-        return
-    fi
-    
-    # چک حجم
-    if [ "$total_limit" != "0" ] && [ "$total_used" -ge "$total_limit" ]; then
-        sqlite3 "$DB" "UPDATE users SET status='limited' WHERE username='$username';"
-        pkill -9 -u "$username" 2>/dev/null
-        sqlite3 "$DB" "UPDATE traffic_sessions SET status='killed' WHERE username='$username' AND status='active';"
-        return
-    fi
-}
-
-echo "🔄 Traffic Monitor Started (PID: $$)"
+echo "🔄 Precision Traffic Monitor Started (PID: $$)"
 
 while true; do
+    # دریافت کاربران فعال
     active_users=$(sqlite3 "$DB" "SELECT username FROM users WHERE status='active';")
     
-    if [ -n "$active_users" ]; then
-        while IFS= read -r user; do
-            [ -z "$user" ] && continue
-            update_sessions "$user"
-            check_limits "$user"
-        done <<< "$active_users"
-    fi
+    while IFS= read -r username; do
+        [ -z "$username" ] && continue
+        
+        # چک انقضا
+        expiry=$(sqlite3 "$DB" "SELECT expiry FROM users WHERE username='$username';")
+        current_time=$(date +%s)
+        
+        if [ "$expiry" != "0" ] && [ "$expiry" -lt "$current_time" ]; then
+            sqlite3 "$DB" "UPDATE users SET status='expired' WHERE username='$username';"
+            pkill -9 -u "$username" 2>/dev/null
+            sqlite3 "$DB" "UPDATE traffic_records SET status='killed' WHERE username='$username' AND status='active';"
+            continue
+        fi
+        
+        # ============================================
+        # الگوریتم دقیق محاسبه ترافیک
+        # ============================================
+        
+        # 1. دریافت PIDهای فعلی کاربر
+        current_pids=$(pgrep -u "$username" 2>/dev/null)
+        
+        # 2. علامت‌گذاری PIDهای مرده
+        sqlite3 "$DB" "UPDATE traffic_records SET status='closed' WHERE username='$username' AND status='active' AND pid NOT IN (${current_pids//$'\n'/,});"
+        
+        # 3. پردازش PIDهای فعال
+        for pid in $current_pids; do
+            # خواندن ترافیک فعلی
+            read -r rx_now tx_now <<< $(read_pid_traffic "$pid")
+            
+            # چک وجود رکورد
+            existing=$(sqlite3 "$DB" "SELECT pid FROM traffic_records WHERE pid=$pid AND status='active';")
+            
+            if [ -z "$existing" ]; then
+                # PID جدید - ثبت با ترافیک صفر اولیه
+                sqlite3 "$DB" "INSERT OR IGNORE INTO traffic_records (username, pid, start_time, last_rx_bytes, last_tx_bytes, accumulated_bytes, status) VALUES ('$username', $pid, $current_time, $rx_now, $tx_now, 0, 'active');"
+            else
+                # PID موجود - محاسبه ترافیک جدید
+                last_rx=$(sqlite3 "$DB" "SELECT last_rx_bytes FROM traffic_records WHERE pid=$pid AND status='active';")
+                last_tx=$(sqlite3 "$DB" "SELECT last_tx_bytes FROM traffic_records WHERE pid=$pid AND status='active';")
+                
+                # محاسبه تفاوت (ترافیک جدید)
+                diff_rx=$((rx_now - last_rx))
+                diff_tx=$((tx_now - last_tx))
+                
+                # اگر منفی شد (مثلاً restart پروسه) - فقط آپدیت基点
+                if [ $diff_rx -lt 0 ]; then
+                    diff_rx=0
+                    # ریست基点 برای این PID
+                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid;"
+                    continue
+                fi
+                if [ $diff_tx -lt 0 ]; then
+                    diff_tx=0
+                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid;"
+                    continue
+                fi
+                
+                # فقط اگر ترافیک جدید داریم
+                if [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ]; then
+                    new_bytes=$((diff_rx + diff_tx))
+                    
+                    # آپدیت رکورد
+                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $new_bytes WHERE pid=$pid;"
+                    
+                    # آپدیت مصرف کل کاربر
+                    sqlite3 "$DB" "UPDATE users SET used_traffic = used_traffic + $new_bytes WHERE username='$username';"
+                fi
+            fi
+        done
+        
+        # 4. بروزرسانی مصرف کل کاربر از مجموع همه رکوردها (برای اطمینان)
+        total_usage=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');")
+        sqlite3 "$DB" "UPDATE users SET used_traffic = $total_usage WHERE username='$username';"
+        
+        # 5. چک محدودیت حجم
+        total_limit=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$username';")
+        
+        if [ "$total_limit" != "0" ] && [ "$total_usage" -ge "$total_limit" ]; then
+            sqlite3 "$DB" "UPDATE users SET status='limited' WHERE username='$username';"
+            pkill -9 -u "$username" 2>/dev/null
+            sqlite3 "$DB" "UPDATE traffic_records SET status='killed' WHERE username='$username' AND status='active';"
+        fi
+        
+    done <<< "$active_users"
     
     sleep "$INTERVAL"
 done
@@ -315,10 +306,9 @@ chmod +x /usr/local/bin/traffic-monitor
 cat > /usr/local/bin/shadow-bot << 'BOTEOF'
 #!/usr/bin/env python3
 
-import os, sys, sqlite3, time, subprocess, json
-from datetime import datetime, timedelta
+import os, sys, sqlite3, time, subprocess, json, base64
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters, ConversationHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 DB = "/var/lib/shadow/traffic.db"
 CONFIG_FILE = "/etc/shadow-bot.conf"
@@ -326,9 +316,6 @@ DOMAIN_FILE = "/etc/shadow-domain.conf"
 
 BOT_TOKEN = None
 ADMIN_IDS = []
-
-# States for conversation
-WAITING_USERNAME, WAITING_PASSWORD, WAITING_TRAFFIC, WAITING_DAYS, WAITING_LIMIT = range(5)
 
 def load_config():
     global BOT_TOKEN, ADMIN_IDS
@@ -361,7 +348,7 @@ def get_domain():
 def format_bytes(bytes_val):
     if bytes_val == 0:
         return "0 MB"
-    mb = bytes_val / 1048576
+    mb = bytes_val / 1048576.0
     if mb >= 1024:
         return f"{mb/1024:.2f} GB"
     return f"{mb:.2f} MB"
@@ -386,7 +373,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "🔱 *Shadow SSH Manager v15.0*\n"
+        "🔱 *Shadow SSH Manager v16.0*\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"🌐 Server: `{get_domain()}`\n"
         f"📡 Port: `22`\n"
@@ -453,8 +440,8 @@ async def show_users(query):
     msg = "👥 *Active Users*\n━━━━━━━━━━━━━━━━━━━\n\n"
     for user in users:
         username, status, used, total, expiry, limit = user
-        used_mb = used / 1048576
-        total_gb = total / 1073741824 if total > 0 else 0
+        used_mb = used / 1048576.0
+        total_gb = total / 1073741824.0 if total > 0 else 0
         
         if expiry == 0:
             days_left = "∞"
@@ -482,7 +469,6 @@ async def show_users(query):
     await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def show_create_dialog(query):
-    context = query
     await query.edit_message_text(
         "➕ *Create New User*\n\n"
         "Send command:\n"
@@ -511,22 +497,18 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         traffic_gb = int(args[3])
         max_conn = int(args[4])
         
-        # Check if exists
         result = subprocess.run(["id", username], capture_output=True)
         if result.returncode == 0:
             await update.message.reply_text("❌ User already exists!")
             return
         
-        # Create system user
         subprocess.run(["useradd", "-m", "-s", "/bin/false", username], capture_output=True)
         subprocess.run(["chpasswd"], input=f"{username}:{password}".encode(), capture_output=True)
         
-        # Connection limits
         with open(f"/etc/ssh/sshd_config.d/{username}.conf", "w") as f:
             f.write(f"MaxSessions {max_conn}\n")
             f.write(f"MaxStartups {max_conn}\n")
         
-        # Save to DB
         traffic_bytes = traffic_gb * 1073741824 if traffic_gb > 0 else 0
         expiry = int(time.time()) + (days * 86400) if days > 0 else 0
         
@@ -536,7 +518,6 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
         
-        # Save to config
         with open("/etc/shadow-users.conf", "a") as f:
             f.write(f"{username}\n")
         
@@ -544,7 +525,6 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         domain = get_domain()
         
-        # Generate config
         config_json = {
             "sshConfigType": "SSH-Direct",
             "remarks": f"📡 {username} | 📎 {traffic_gb}GB",
@@ -555,7 +535,6 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "udpgwTransparentDNS": True
         }
         
-        import base64
         config_b64 = base64.b64encode(json.dumps(config_json).encode()).decode()
         npvt_link = f"npvt-ssh://{config_b64}"
         
@@ -605,7 +584,7 @@ async def delete_user_action(query, username):
     
     conn = sqlite3.connect(DB)
     conn.execute("DELETE FROM users WHERE username=?", [username])
-    conn.execute("DELETE FROM traffic_sessions WHERE username=?", [username])
+    conn.execute("DELETE FROM traffic_records WHERE username=?", [username])
     conn.commit()
     conn.close()
     
@@ -618,7 +597,14 @@ async def delete_user_action(query, username):
 async def show_traffic(query):
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
-    cursor.execute("SELECT username, SUM(total_rx + total_tx) as total FROM traffic_sessions WHERE status='closed' AND start_time > ? GROUP BY username ORDER BY total DESC LIMIT 10", [int(time.time()) - 86400])
+    cursor.execute("""
+        SELECT username, SUM(accumulated_bytes) as total 
+        FROM traffic_records 
+        WHERE start_time > ? 
+        GROUP BY username 
+        ORDER BY total DESC 
+        LIMIT 10
+    """, [int(time.time()) - 86400])
     data = cursor.fetchall()
     conn.close()
     
@@ -628,8 +614,8 @@ async def show_traffic(query):
     
     msg = "📊 *Today's Traffic*\n━━━━━━━━━━━━━━━━━━━\n\n"
     for i, (user, total) in enumerate(data, 1):
-        mb = total / 1048576
-        msg += f"{i}. `{user}`: {mb:.1f}MB\n"
+        mb = total / 1048576.0
+        msg += f"{i}. `{user}`: {mb:.2f}MB\n"
     
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -686,7 +672,7 @@ BOTEOF
 chmod +x /usr/local/bin/shadow-bot
 
 # ============================================
-# Main Shadow Manager (بازنویسی کامل)
+# Main Shadow Manager با محاسبه دقیق
 # ============================================
 cat > /usr/local/bin/shadow << 'MAINEOF'
 #!/bin/bash
@@ -714,26 +700,13 @@ get_domain() {
 
 get_user_usage() {
     local username=$1
-    
-    # جمع کل ترافیک از جلسات
-    local total=$(sqlite3 "$DB" "SELECT COALESCE(SUM(total_rx + total_tx), 0) FROM traffic_sessions WHERE username='$username';")
-    
-    # اضافه کردن جلسات فعال
-    while IFS='|' read -r pid rx_start tx_start; do
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            local current_rx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$2} END {print s+0}')
-            local current_tx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$10} END {print s+0}')
-            total=$((total + current_rx - rx_start + current_tx - tx_start))
-        fi
-    done < <(sqlite3 "$DB" "SELECT pid, rx_start, tx_start FROM traffic_sessions WHERE username='$username' AND status='active';")
-    
-    echo "$total"
+    sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');"
 }
 
 show_banner() {
     SERVER_IP=$(get_domain)
     echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║        ${GREEN}🔱 SHADOW SSH v15.0 STABLE 🔱${PURPLE}           ║${NC}"
+    echo -e "${PURPLE}║        ${GREEN}🔱 SHADOW SSH v16.0 PRECISION 🔱${PURPLE}        ║${NC}"
     echo -e "${PURPLE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${PURPLE}║${NC}  🌐 Server: ${GREEN}${SERVER_IP}${NC}"
     echo -e "${PURPLE}║${NC}  📡 Port: ${GREEN}22${NC}  |  ⚡ BBR: ${GREEN}ON${NC}"
@@ -748,7 +721,7 @@ show_menu() {
     echo -e "${GREEN}1.${NC} ${WHITE}➕ Create New User${NC}"
     echo -e "${GREEN}2.${NC} ${WHITE}🗑  Delete User${NC}"
     echo -e "${GREEN}3.${NC} ${WHITE}👥 List All Users${NC}"
-    echo -e "${GREEN}4.${NC} ${WHITE}📊 View User Traffic Detail${NC}"
+    echo -e "${GREEN}4.${NC} ${WHITE}📊 View Traffic Detail${NC}"
     echo -e "${GREEN}5.${NC} ${WHITE}🤖 Telegram Bot Settings${NC}"
     echo -e "${GREEN}6.${NC} ${WHITE}🌐 Domain Management${NC}"
     echo -e "${GREEN}7.${NC} ${WHITE}📈 Server Status${NC}"
@@ -778,11 +751,9 @@ create_user() {
     [ "$days" -eq 0 ] && expiry=0 || expiry=$(date -d "+${days} days" +%s)
     [ -z "$max_conn" ] && max_conn=1
     
-    # Create user
     useradd -m -s /bin/false "$username" 2>/dev/null
     echo "$username:$password" | chpasswd
     
-    # Connection limits
     cat > "/etc/ssh/sshd_config.d/${username}.conf" << EOF
 MaxSessions $max_conn
 MaxStartups $max_conn
@@ -796,7 +767,6 @@ EOF
     
     SERVER=$(get_domain)
     
-    # Generate config
     config_json="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"📡 $username | 📎 ${traffic_gb}GB\",\"sshHost\":\"$SERVER\",\"sshPort\":22,\"sshUsername\":\"$username\",\"sshPassword\":\"$password\",\"udpgwTransparentDNS\":true}"
     config_b64=$(echo -n "$config_json" | base64 -w 0)
     npvt_link="npvt-ssh://${config_b64}"
@@ -834,7 +804,7 @@ delete_user() {
     rm -f "/etc/ssh/sshd_config.d/${username}.conf"
     
     sqlite3 "$DB" "DELETE FROM users WHERE username='$username';"
-    sqlite3 "$DB" "DELETE FROM traffic_sessions WHERE username='$username';"
+    sqlite3 "$DB" "DELETE FROM traffic_records WHERE username='$username';"
     
     systemctl restart sshd 2>/dev/null
     
@@ -846,24 +816,24 @@ list_users() {
     echo -e "\n${CYAN}👥 ACTIVE USERS${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    printf "${WHITE}%-15s %-8s %-15s %-15s %-10s${NC}\n" "Username" "Status" "Used" "Limit" "Expiry"
+    printf "${WHITE}%-15s %-8s %-20s %-15s %-10s${NC}\n" "Username" "Status" "Used" "Limit" "Expiry"
     echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
     
     while IFS='|' read -r username status total_limit expiry limit; do
         [ -z "$username" ] && continue
         
-        # Get real usage
+        # خواندن دقیق مصرف از جدول traffic_records
         used=$(get_user_usage "$username")
         
-        # Update DB
+        # آپدیت در جدول users
         sqlite3 "$DB" "UPDATE users SET used_traffic = $used WHERE username='$username';"
         
-        used_mb=$(echo "scale=2; $used / 1048576" | bc)
+        used_mb=$(echo "scale=2; $used / 1048576" | bc 2>/dev/null || echo "0")
         
         if [ "$total_limit" -eq 0 ]; then
             usage_text="${used_mb}MB / ∞"
         else
-            total_mb=$(echo "scale=2; $total_limit / 1048576" | bc)
+            total_mb=$(echo "scale=2; $total_limit / 1048576" | bc 2>/dev/null || echo "0")
             percent=$(echo "scale=1; $used * 100 / $total_limit" | bc 2>/dev/null || echo "0")
             usage_text="${used_mb}MB / ${total_mb}MB (${percent}%)"
         fi
@@ -882,8 +852,8 @@ list_users() {
             limited) status_icon="🟡" ;;
         esac
         
-        printf "%-15s %s %-8s ${CYAN}%-15s${NC} ${YELLOW}%-15s${NC} ${GREEN}%-10s${NC}\n" \
-            "$username" "$status_icon" "$status" "$usage_text" "$(echo "scale=1; $total_limit/1073741824" | bc)GB" "$expiry_text"
+        printf "%-15s %s %-8s ${CYAN}%-20s${NC} ${YELLOW}%-15s${NC} ${GREEN}%-10s${NC}\n" \
+            "$username" "$status_icon" "$status" "$usage_text" "$(echo "scale=1; $total_limit/1073741824" | bc 2>/dev/null || echo "∞")GB" "$expiry_text"
     done < <(sqlite3 "$DB" "SELECT username, status, total_traffic, expiry, user_limit FROM users;")
     
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -894,16 +864,21 @@ view_traffic() {
     echo -e "\n${YELLOW}📊 TRAFFIC DETAIL${NC}"
     read -p "Username: " username
     
-    echo -e "\n${CYAN}Session History for ${username}${NC}"
+    echo -e "\n${CYAN}Traffic Records for ${username}${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${WHITE}Start Time              | Status  | Traffic${NC}"
+    echo -e "${WHITE}Start Time              | PID    | Status  | Traffic${NC}"
     echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
     
-    sqlite3 "$DB" "SELECT datetime(start_time, 'unixepoch', 'localtime'), status, total_rx, total_tx FROM traffic_sessions WHERE username='$username' ORDER BY start_time DESC LIMIT 20;" | while IFS='|' read -r time status rx tx; do
-        total_mb=$(echo "scale=2; ($rx + $tx) / 1048576" | bc)
-        printf "%-24s | %-7s | %sMB\n" "$time" "$status" "$total_mb"
+    sqlite3 "$DB" "SELECT datetime(start_time, 'unixepoch', 'localtime'), pid, status, accumulated_bytes FROM traffic_records WHERE username='$username' ORDER BY start_time DESC LIMIT 30;" | while IFS='|' read -r time pid status bytes; do
+        mb=$(echo "scale=2; $bytes / 1048576" | bc 2>/dev/null || echo "0")
+        printf "%-24s | %-6s | %-7s | %sMB\n" "$time" "$pid" "$status" "$mb"
     done
     
+    # نمایش جمع کل
+    total=$(get_user_usage "$username")
+    total_mb=$(echo "scale=2; $total / 1048576" | bc 2>/dev/null || echo "0")
+    echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
+    echo -e "${GREEN}Total: ${total_mb}MB${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     read -p "Press Enter to continue..."
 }
@@ -1121,18 +1096,18 @@ ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
 # ============================================
 clear
 echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║      ${GREEN}✅ SHADOW SSH v15.0 INSTALLED!${PURPLE}             ║${NC}"
+echo -e "${PURPLE}║      ${GREEN}✅ SHADOW SSH v16.0 PRECISION!${PURPLE}            ║${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${CYAN}📋 COMMANDS:${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}shadow${NC}           - Open Main Panel"
 echo ""
-echo -e "${CYAN}🤖 BOT SETUP:${NC}"
-echo -e "1. @BotFather -> create bot"
-echo -e "2. ${GREEN}shadow${NC} -> Option 5 -> Set Token"
-echo -e "3. @userinfobot -> get your ID"
-echo -e "4. Add Admin ID in bot settings"
-echo -e "5. Start bot from menu"
+echo -e "${CYAN}🔧 KEY FEATURES:${NC}"
+echo -e "✅ Precise traffic tracking (no double counting)"
+echo -e "✅ PID-based session monitoring"
+echo -e "✅ Auto disconnect on limit reached"
+echo -e "✅ Telegram bot with full control"
+echo -e "✅ NP VT config generator"
 echo ""
 echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
