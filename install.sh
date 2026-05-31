@@ -1,20 +1,16 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v22.0 - GOD MODE EDITION
+# Shadow SSH v25.0 - HAKIM EDITION
+# Auto IP Detection + Half-Price Iranian Sites
 # Features:
-# - Protocol Obfuscator Pro (YouTube/Netflix/Google/Twitter/WhatsApp profiles)
-# - Config Expiry Countdown (Live timer in config name)
-# - One-Click Backup & Restore (Telegram + Google Drive)
-# - Backup on Telegram Bot
-# - Fake Location (6 countries)
-# - Fake DNS (1ms response)
-# - AI Optimizer (Auto MTU)
-# - Smart Config Generator (NapsternetV + V2Ray only)
-# - Auto Domain Detection
-# - Domain Management (Add/Delete unified)
-# - AI Config Checker
-# - NO Fake Ping (Removed)
+# - Smart Half-Price System (Auto .ir + GeoIP detection)
+# - Real-Time Traffic Dedup (Duplicate PID killer)
+# - Kernel-Level Traffic Counter (conntrack)
+# - Bandwidth Rate Limiter Per User
+# - ping-net Debug Tool
+# - Fake Location + Fake DNS + AI Optimizer + Backup
+# - Domain Management (Add/Delete/SSL unified)
 # =============================================
 
 RED='\033[0;31m'
@@ -33,11 +29,11 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ============================================
-# SPACE SPEED + AI Optimizer
+# HAKIM Network Optimizer
 # ============================================
 optimize_network() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}   🚀 Activating GOD MODE Network${NC}"
+    echo -e "${YELLOW}   🚀 Activating HAKIM Network${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
     for iface in $(ls /sys/class/net/ | grep -v lo); do
@@ -76,12 +72,13 @@ net.ipv4.tcp_keepalive_intvl = 10
 net.ipv4.tcp_keepalive_probes = 2
 net.ipv4.ip_forward = 1
 net.ipv4.ip_local_port_range = 1024 6553500
-net.ipv4.tcp_rfc1337 = 1
+net.netfilter.nf_conntrack_max = 1048576
 EOF
     sysctl -p >/dev/null 2>&1
     modprobe tcp_bbr 2>/dev/null
+    modprobe nf_conntrack 2>/dev/null
     
-    cat > /etc/ssh/sshd_config.d/99-god-mode.conf << 'TURBOEOF'
+    cat > /etc/ssh/sshd_config.d/99-hakim.conf << 'TURBOEOF'
 Compression no
 TCPKeepAlive yes
 ClientAliveInterval 10
@@ -99,7 +96,7 @@ TURBOEOF
         tc qdisc add dev $iface root fq maxrate 100gbit 2>/dev/null
     done
     
-    echo -e "${GREEN}   ✅ GOD MODE Network Activated${NC}"
+    echo -e "${GREEN}   ✅ HAKIM Network Activated${NC}"
 }
 
 # ============================================
@@ -113,25 +110,28 @@ systemctl stop traffic-monitor 2>/dev/null
 systemctl stop shadow-bot 2>/dev/null
 systemctl stop fake-dns 2>/dev/null
 systemctl stop ai-optimizer 2>/dev/null
-systemctl stop obfuscator 2>/dev/null
-systemctl disable traffic-monitor shadow-bot fake-dns ai-optimizer obfuscator 2>/dev/null
+systemctl stop shadow-backup 2>/dev/null
+systemctl stop half-price 2>/dev/null
+systemctl stop dedup-monitor 2>/dev/null
+systemctl stop rate-limiter 2>/dev/null
+systemctl disable traffic-monitor shadow-bot fake-dns ai-optimizer shadow-backup half-price dedup-monitor rate-limiter 2>/dev/null
 
 pkill -9 -f "traffic-monitor" 2>/dev/null
 pkill -9 -f "shadow-bot" 2>/dev/null
 pkill -9 -f "fake-dns" 2>/dev/null
 pkill -9 -f "ai-optimizer" 2>/dev/null
 pkill -9 -f "fake-location" 2>/dev/null
-pkill -9 -f "obfuscator" 2>/dev/null
-pkill -9 -f "fake-ping" 2>/dev/null
+pkill -9 -f "ping-net" 2>/dev/null
+pkill -9 -f "half-price" 2>/dev/null
+pkill -9 -f "rate-limiter" 2>/dev/null
+pkill -9 -f "dedup-monitor" 2>/dev/null
 
 tc qdisc del dev eth0 root 2>/dev/null
 tc qdisc del dev ens3 root 2>/dev/null
 tc qdisc del dev lo root 2>/dev/null
 iptables -t mangle -F 2>/dev/null
-iptables -t nat -F SHADOW_FAKE 2>/dev/null
-iptables -t nat -X SHADOW_FAKE 2>/dev/null
-iptables -t nat -F SHADOW_OBFUSCATE 2>/dev/null
-iptables -t nat -X SHADOW_OBFUSCATE 2>/dev/null
+iptables -t nat -F 2>/dev/null
+conntrack -F 2>/dev/null
 
 if [ -f /etc/shadow-users.conf ]; then
     for user in $(cut -d: -f1 /etc/shadow-users.conf 2>/dev/null); do
@@ -140,7 +140,7 @@ if [ -f /etc/shadow-users.conf ]; then
     done
 fi
 
-rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /usr/local/bin/shadow-bot /usr/local/bin/fake-dns /usr/local/bin/fake-location /usr/local/bin/fake-ping /usr/local/bin/ai-optimizer /usr/local/bin/obfuscator /usr/local/bin/config-generator /usr/local/bin/backup-manager /etc/shadow-* /var/lib/shadow /etc/systemd/system/traffic-monitor.service /etc/systemd/system/shadow-bot.service /etc/systemd/system/fake-dns.service /etc/systemd/system/ai-optimizer.service /etc/systemd/system/obfuscator.service /etc/ssh/sshd_config.d/*.conf 2>/dev/null
+rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /usr/local/bin/shadow-bot /usr/local/bin/fake-dns /usr/local/bin/fake-location /usr/local/bin/ai-optimizer /usr/local/bin/backup-manager /usr/local/bin/config-checker /usr/local/bin/ping-net /usr/local/bin/half-price /usr/local/bin/rate-limiter /usr/local/bin/dedup-monitor /etc/shadow-* /var/lib/shadow /etc/systemd/system/traffic-monitor.service /etc/systemd/system/shadow-bot.service /etc/systemd/system/fake-dns.service /etc/systemd/system/ai-optimizer.service /etc/systemd/system/shadow-backup.service /etc/systemd/system/half-price.service /etc/systemd/system/rate-limiter.service /etc/systemd/system/dedup-monitor.service /etc/ssh/sshd_config.d/*.conf 2>/dev/null
 
 # ============================================
 # Install Dependencies
@@ -150,9 +150,18 @@ echo -e "${YELLOW}   📦 Installing Dependencies${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 apt update -qq
-apt install -y -qq curl wget openssh-server sqlite3 bc lsof procps python3 python3-pip net-tools certbot nginx jq ethtool iproute2 geoip-bin geoip-database dnsmasq python3-requests 2>/dev/null
+apt install -y -qq curl wget openssh-server sqlite3 bc lsof procps python3 python3-pip net-tools certbot nginx jq ethtool iproute2 geoip-bin geoip-database dnsmasq conntrack conntrackd mmdb-bin 2>/dev/null
 
-pip3 install --break-system-packages python-telegram-bot==20.7 geoip2 dnspython requests flask flask-socketio 2>/dev/null
+pip3 install --break-system-packages python-telegram-bot==20.7 geoip2 dnspython requests maxminddb 2>/dev/null
+
+# Download latest GeoIP database for Iranian IPs
+echo -e "${BLUE}📥 Downloading GeoIP Database...${NC}"
+mkdir -p /usr/share/GeoIP
+curl -sL "https://git.io/GeoLite2-Country.mmdb" -o /usr/share/GeoIP/GeoLite2-Country.mmdb 2>/dev/null || {
+    # Fallback: Use geoipupdate
+    apt install -y -qq geoipupdate 2>/dev/null
+    geoipupdate 2>/dev/null
+}
 
 optimize_network
 
@@ -181,7 +190,7 @@ mkdir -p /etc/ssh/sshd_config.d
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 
 # ============================================
-# Domain Setup (Unified)
+# Domain Setup
 # ============================================
 setup_domain() {
     echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -197,53 +206,39 @@ setup_domain() {
     
     echo ""
     echo -e "1. Add/Change Domain"
-    echo -e "2. Get Free SSL Certificate"
-    echo -e "3. Delete Current Domain"
-    echo -e "4. Skip (Continue without domain)"
+    echo -e "2. Get Free SSL"
+    echo -e "3. Delete Domain"
+    echo -e "4. Skip"
     echo ""
     echo -n -e "Select [1-4]: "
-    read domain_choice
+    read choice
     
-    case $domain_choice in
+    case $choice in
         1)
-            echo ""
-            echo -n -e "Enter domain (e.g., ssh.example.com): "
+            echo -n -e "Domain: "
             read DOMAIN
             echo "$DOMAIN" > /etc/shadow-domain.conf
             echo -e "${GREEN}✅ Domain saved: $DOMAIN${NC}"
             ;;
         2)
-            echo ""
             if [ -f /etc/shadow-domain.conf ] && [ -s /etc/shadow-domain.conf ]; then
                 DOMAIN=$(cat /etc/shadow-domain.conf)
-                echo -n -e "Enter your email: "
+                echo -n -e "Email: "
                 read EMAIL
-                echo -e "${YELLOW}🔐 Obtaining SSL Certificate...${NC}"
                 systemctl stop nginx 2>/dev/null
                 certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" 2>/dev/null
-                
-                if [ $? -eq 0 ]; then
-                    echo -e "${GREEN}✅ SSL Certificate obtained!${NC}"
-                    echo -e "${GREEN}   Certificate: /etc/letsencrypt/live/$DOMAIN/fullchain.pem${NC}"
-                    echo -e "${GREEN}   Private Key: /etc/letsencrypt/live/$DOMAIN/privkey.pem${NC}"
-                else
-                    echo -e "${RED}❌ SSL failed${NC}"
-                fi
+                [ $? -eq 0 ] && echo -e "${GREEN}✅ SSL obtained!${NC}" || echo -e "${RED}❌ SSL failed${NC}"
             else
-                echo -e "${RED}❌ No domain set! Add domain first${NC}"
+                echo -e "${RED}❌ No domain set!${NC}"
             fi
             ;;
         3)
-            echo ""
-            echo -n -e "${RED}Delete domain? (y/n): ${NC}"
+            echo -n -e "${RED}Delete? (y/n): ${NC}"
             read confirm
-            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-                rm -f /etc/shadow-domain.conf
-                echo -e "${GREEN}✅ Domain deleted${NC}"
-            fi
+            [ "$confirm" = "y" ] && rm -f /etc/shadow-domain.conf && echo -e "${GREEN}✅ Deleted${NC}"
             ;;
         4)
-            echo -e "${BLUE}ℹ️  Skipping domain setup${NC}"
+            echo -e "${BLUE}ℹ️  Skipping${NC}"
             ;;
     esac
 }
@@ -265,22 +260,30 @@ CREATE TABLE IF NOT EXISTS users (
     password TEXT,
     total_traffic INTEGER DEFAULT 0,
     used_traffic INTEGER DEFAULT 0,
+    half_price_traffic INTEGER DEFAULT 0,
+    iranian_traffic INTEGER DEFAULT 0,
+    foreign_traffic INTEGER DEFAULT 0,
     expiry INTEGER,
     created INTEGER,
     status TEXT DEFAULT 'active',
-    user_limit INTEGER DEFAULT 1
+    user_limit INTEGER DEFAULT 1,
+    speed_limit INTEGER DEFAULT 0,
+    time_limit INTEGER DEFAULT 0,
+    allowed_ips TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS traffic_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     pid INTEGER,
     ppid INTEGER,
+    dest_ip TEXT,
+    is_iranian INTEGER DEFAULT 0,
+    packet_hash TEXT UNIQUE,
     start_time INTEGER,
     last_rx_bytes INTEGER DEFAULT 0,
     last_tx_bytes INTEGER DEFAULT 0,
     accumulated_bytes INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'active',
-    UNIQUE(pid, ppid)
+    status TEXT DEFAULT 'active'
 );
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -298,296 +301,252 @@ INSERT OR IGNORE INTO settings VALUES ('fake_country', 'US');
 INSERT OR IGNORE INTO settings VALUES ('fake_dns', 'disabled');
 INSERT OR IGNORE INTO settings VALUES ('fake_dns_delay', '1');
 INSERT OR IGNORE INTO settings VALUES ('ai_optimizer', 'enabled');
-INSERT OR IGNORE INTO settings VALUES ('obfuscator', 'disabled');
-INSERT OR IGNORE INTO settings VALUES ('obfuscator_profile', 'youtube');
 INSERT OR IGNORE INTO settings VALUES ('backup_telegram', 'disabled');
-INSERT OR IGNORE INTO settings VALUES ('backup_gdrive', 'disabled');
+INSERT OR IGNORE INTO settings VALUES ('traffic_dedup', 'enabled');
+INSERT OR IGNORE INTO settings VALUES ('half_price', 'enabled');
+INSERT OR IGNORE INTO settings VALUES ('debug_mode', 'disabled');
+INSERT OR IGNORE INTO settings VALUES ('conntrack_mode', 'enabled');
 SQLEOF
 
 echo -e "${GREEN}   ✅ Database Created${NC}"
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v22.0 - GOD MODE${NC}"
+echo -e "${GREEN}   Shadow SSH v25.0 - HAKIM${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 echo ""
 
 # ============================================
-# Protocol Obfuscator Pro (Idea #3)
+# Smart Half-Price System (Auto IP Detection)
 # ============================================
-cat > /usr/local/bin/obfuscator << 'OBFEOF'
+cat > /usr/local/bin/half-price << 'HALFEOF'
 #!/bin/bash
-# Protocol Obfuscator Pro - Makes SSH look like YouTube/Netflix/Google/Twitter/WhatsApp
+# Smart Half-Price System - Auto-detect Iranian destinations
 DB="/var/lib/shadow/traffic.db"
 
-PROFILES=("youtube" "netflix" "google" "twitter" "whatsapp")
-PROFILE_NAMES=("YouTube" "Netflix" "Google" "Twitter" "WhatsApp")
-
-start_obfuscator() {
-    local profile=$1
+check_iranian() {
+    local ip=$1
     
-    stop_obfuscator
+    # Skip private/local IPs
+    if echo "$ip" | grep -qE '^(10\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.168\.|127\.|0\.)'; then
+        return 1
+    fi
     
-    case $profile in
-        youtube)
-            # YouTube obfuscation
-            iptables -t mangle -A OUTPUT -p tcp --sport 22 -j TOS --set-tos 0x68 2>/dev/null
-            iptables -t mangle -A OUTPUT -p tcp --sport 22 -j DSCP --set-dscp 0x2e 2>/dev/null
-            for iface in $(ls /sys/class/net/ | grep -v lo); do
-                tc qdisc add dev $iface root netem rate 100mbit 2>/dev/null
-            done
-            echo "✅ YouTube profile activated"
-            ;;
-        netflix)
-            # Netflix obfuscation
-            iptables -t mangle -A OUTPUT -p tcp --sport 22 -j TOS --set-tos 0x80 2>/dev/null
-            for iface in $(ls /sys/class/net/ | grep -v lo); do
-                tc qdisc add dev $iface root netem rate 200mbit 2>/dev/null
-            done
-            echo "✅ Netflix profile activated"
-            ;;
-        google)
-            # Google obfuscation
-            iptables -t mangle -A OUTPUT -p tcp --sport 22 -j TOS --set-tos 0x40 2>/dev/null
-            for iface in $(ls /sys/class/net/ | grep -v lo); do
-                tc qdisc add dev $iface root netem rate 50mbit 2>/dev/null
-            done
-            echo "✅ Google profile activated"
-            ;;
-        twitter)
-            # Twitter obfuscation
-            iptables -t mangle -A OUTPUT -p tcp --sport 22 -j TOS --set-tos 0x20 2>/dev/null
-            for iface in $(ls /sys/class/net/ | grep -v lo); do
-                tc qdisc add dev $iface root netem rate 30mbit 2>/dev/null
-            done
-            echo "✅ Twitter profile activated"
-            ;;
-        whatsapp)
-            # WhatsApp obfuscation
-            iptables -t mangle -A OUTPUT -p tcp --sport 22 -j TOS --set-tos 0x10 2>/dev/null
-            for iface in $(ls /sys/class/net/ | grep -v lo); do
-                tc qdisc add dev $iface root netem rate 10mbit 2>/dev/null
-            done
-            echo "✅ WhatsApp profile activated"
-            ;;
-    esac
+    # Method 1: Check with geoiplookup (fastest)
+    if command -v geoiplookup &>/dev/null; then
+        local result=$(geoiplookup "$ip" 2>/dev/null)
+        if echo "$result" | grep -qE 'IR,|Iran'; then
+            return 0
+        fi
+    fi
     
-    sqlite3 "$DB" "UPDATE settings SET value='enabled' WHERE key='obfuscator';"
-    sqlite3 "$DB" "UPDATE settings SET value='$profile' WHERE key='obfuscator_profile';"
+    # Method 2: Check with Python + maxminddb (more accurate)
+    if command -v python3 &>/dev/null && [ -f /usr/share/GeoIP/GeoLite2-Country.mmdb ]; then
+        local country=$(python3 -c "
+import maxminddb
+reader = maxminddb.open_database('/usr/share/GeoIP/GeoLite2-Country.mmdb')
+result = reader.get('$ip')
+if result and 'country' in result:
+    print(result['country']['iso_code'])
+reader.close()
+" 2>/dev/null)
+        if [ "$country" = "IR" ]; then
+            return 0
+        fi
+    fi
+    
+    # Method 3: Reverse DNS check for .ir domains
+    if command -v host &>/dev/null; then
+        local hostname=$(timeout 2 host "$ip" 2>/dev/null | grep -oP 'pointer \K.*' | head -1)
+        if echo "$hostname" | grep -q '\.ir\.$'; then
+            return 0
+        fi
+    fi
+    
+    return 1
 }
 
-stop_obfuscator() {
-    iptables -t mangle -F 2>/dev/null
+process_connection() {
+    local username=$1
+    local dest_ip=$2
+    local bytes=$3
     
-    for iface in $(ls /sys/class/net/ | grep -v lo); do
-        tc qdisc del dev $iface root 2>/dev/null
-        tc qdisc add dev $iface root fq maxrate 100gbit 2>/dev/null
-    done
-    
-    sqlite3 "$DB" "UPDATE settings SET value='disabled' WHERE key='obfuscator';"
-    echo "✅ Obfuscator disabled"
-}
-
-status_obfuscator() {
-    local status=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='obfuscator';")
-    local profile=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='obfuscator_profile';")
-    
-    if [ "$status" = "enabled" ]; then
-        echo "Status: ENABLED"
-        echo "Profile: $profile"
+    if check_iranian "$dest_ip"; then
+        # Iranian destination - Half price
+        local half_bytes=$((bytes / 2))
+        sqlite3 "$DB" "UPDATE users SET half_price_traffic = half_price_traffic + $bytes, iranian_traffic = iranian_traffic + $bytes, used_traffic = used_traffic + $half_bytes WHERE username='$username';"
+        echo "HALF"
     else
-        echo "Status: DISABLED"
+        # Foreign destination - Full price
+        sqlite3 "$DB" "UPDATE users SET foreign_traffic = foreign_traffic + $bytes, used_traffic = used_traffic + $bytes WHERE username='$username';"
+        echo "FULL"
     fi
 }
 
+# Continuous monitoring mode
+monitor_mode() {
+    echo "🔄 Half-Price Monitor Started"
+    
+    while true; do
+        # Get active SSH connections from conntrack
+        conntrack -L -p tcp --dport 22 2>/dev/null | while read line; do
+            local src_ip=$(echo "$line" | grep -oP 'src=\K[\d.]+')
+            local dst_ip=$(echo "$line" | grep -oP 'dst=\K[\d.]+')
+            
+            if [ -n "$src_ip" ] && [ -n "$dst_ip" ]; then
+                # Find which user owns this IP
+                local username=$(ss -tnp | grep "$src_ip" | grep -oP 'users:\(\("sshd",pid=\d+,fd=\d+\)\)' | head -1)
+                if [ -n "$username" ]; then
+                    check_iranian "$dst_ip" >/dev/null
+                fi
+            fi
+        done
+        sleep 5
+    done
+}
+
 case "$1" in
-    start)
-        profile=${2:-youtube}
-        start_obfuscator "$profile"
+    check)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 check <IP>"
+            exit 1
+        fi
+        if check_iranian "$2"; then
+            echo "✅ Iranian - Half Price"
+        else
+            echo "🌍 Foreign - Full Price"
+        fi
         ;;
-    stop)
-        stop_obfuscator
+    process)
+        if [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+            echo "Usage: $0 process <username> <dest_ip> <bytes>"
+            exit 1
+        fi
+        process_connection "$2" "$3" "$4"
+        ;;
+    monitor)
+        monitor_mode
         ;;
     status)
-        status_obfuscator
-        ;;
-    list)
-        echo "Available Profiles:"
-        for i in "${!PROFILES[@]}"; do
-            echo "  ${PROFILES[$i]} - ${PROFILE_NAMES[$i]}"
-        done
+        echo ""
+        echo -e "${CYAN}Half-Price Status:${NC}"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        while IFS='|' read -r username iranian foreign half; do
+            [ -z "$username" ] && continue
+            local iran_mb=$(echo "scale=2; $iranian / 1048576" | bc 2>/dev/null || echo "0")
+            local foreign_mb=$(echo "scale=2; $foreign / 1048576" | bc 2>/dev/null || echo "0")
+            local half_mb=$(echo "scale=2; $half / 1048576" | bc 2>/dev/null || echo "0")
+            echo -e "  ${GREEN}$username${NC}: 🇮🇷 ${iran_mb}MB (half-price) | 🌍 ${foreign_mb}MB (full) | 💰 Saved: ${half_mb}MB"
+        done < <(sqlite3 "$DB" "SELECT username, iranian_traffic, foreign_traffic, half_price_traffic FROM users;")
         ;;
     *)
-        echo "Protocol Obfuscator Pro"
-        echo "Usage: $0 {start <profile>|stop|status|list}"
+        echo "Smart Half-Price System"
         echo ""
-        echo "Profiles: youtube, netflix, google, twitter, whatsapp"
+        echo "Usage:"
+        echo "  $0 check <IP>              - Check if IP is Iranian"
+        echo "  $0 process <user> <IP> <B> - Process connection"
+        echo "  $0 monitor                 - Start monitoring mode"
+        echo "  $0 status                  - Show half-price status"
         ;;
 esac
-OBFEOF
+HALFEOF
 
-chmod +x /usr/local/bin/obfuscator
+chmod +x /usr/local/bin/half-price
 
 # ============================================
-# Backup Manager (Idea #5) - Telegram + Local
+# Traffic Dedup Monitor
 # ============================================
-cat > /usr/local/bin/backup-manager << 'BACKEOF'
+cat > /usr/local/bin/dedup-monitor << 'DEDUPEOF'
 #!/bin/bash
-# One-Click Backup & Restore Manager
 DB="/var/lib/shadow/traffic.db"
-BACKUP_DIR="/var/backups/shadow"
-BOT_CONFIG="/etc/shadow-bot.conf"
+PID_FILE="/var/run/dedup-monitor.pid"
 
-create_backup() {
-    local timestamp=$(date +%Y%m%d_%H%M%S)
-    local backup_file="$BACKUP_DIR/shadow_backup_${timestamp}.tar.gz"
-    
-    mkdir -p "$BACKUP_DIR"
-    
-    # Backup database and configs
-    tar -czf "$backup_file" \
-        /var/lib/shadow/traffic.db \
-        /etc/shadow-users.conf \
-        /etc/shadow-domain.conf \
-        /etc/shadow-bot.conf \
-        /etc/ssh/sshd_config.d/ 2>/dev/null
-    
-    local size=$(stat -c %s "$backup_file")
-    local size_mb=$(echo "scale=2; $size / 1048576" | bc)
-    
-    # Save to database
-    sqlite3 "$DB" "INSERT INTO backup_history (backup_time, filename, size, type) VALUES ($(date +%s), '$backup_file', $size, 'local');"
-    
-    echo "$backup_file"
-    echo "$size_mb"
-}
+[ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null && exit 1
+echo $$ > "$PID_FILE"
+trap "rm -f $PID_FILE" EXIT
 
-restore_backup() {
-    local backup_file=$1
+echo "🔄 Dedup Monitor Started (PID: $$)"
+
+while true; do
+    active_users=$(sqlite3 "$DB" "SELECT username FROM users WHERE status='active';")
     
-    if [ ! -f "$backup_file" ]; then
-        echo "❌ Backup file not found!"
-        return 1
+    while IFS= read -r username; do
+        [ -z "$username" ] && continue
+        
+        duplicates=$(sqlite3 "$DB" "SELECT pid, COUNT(*) as cnt FROM traffic_records WHERE username='$username' AND status='active' GROUP BY pid HAVING cnt > 1;")
+        
+        if [ -n "$duplicates" ]; then
+            while IFS='|' read -r pid count; do
+                [ -z "$pid" ] && continue
+                
+                record_ids=($(sqlite3 "$DB" "SELECT id FROM traffic_records WHERE username='$username' AND pid=$pid AND status='active' ORDER BY id ASC;"))
+                
+                if [ ${#record_ids[@]} -gt 1 ]; then
+                    first_id=${record_ids[0]}
+                    total_bytes=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND pid=$pid AND status='active';")
+                    
+                    sqlite3 "$DB" "UPDATE traffic_records SET accumulated_bytes = $total_bytes WHERE id = $first_id;"
+                    
+                    for ((i=1; i<${#record_ids[@]}; i++)); do
+                        sqlite3 "$DB" "DELETE FROM traffic_records WHERE id = ${record_ids[$i]};"
+                    done
+                    
+                    echo "[$(date)] Fixed duplicate: User=$username PID=$pid (merged ${#record_ids[@]} records)"
+                fi
+            done <<< "$duplicates"
+        fi
+    done <<< "$active_users"
+    
+    sleep 30
+done
+DEDUPEOF
+
+chmod +x /usr/local/bin/dedup-monitor
+
+# ============================================
+# Rate Limiter Per User
+# ============================================
+cat > /usr/local/bin/rate-limiter << 'RATEEOF'
+#!/bin/bash
+DB="/var/lib/shadow/traffic.db"
+
+apply_rate_limit() {
+    local username=$1
+    local speed_kbps=$2
+    
+    if [ "$speed_kbps" -eq 0 ]; then
+        iptables -t mangle -D SHADOW_LIMIT -m owner --uid-owner "$username" -j MARK --set-mark 1 2>/dev/null
+        return
     fi
     
-    # Stop services
-    systemctl stop traffic-monitor shadow-bot 2>/dev/null
+    iptables -t mangle -N SHADOW_LIMIT 2>/dev/null
     
-    # Restore
-    tar -xzf "$backup_file" -C /
-    
-    # Start services
-    systemctl start traffic-monitor shadow-bot 2>/dev/null
-    
-    echo "✅ Restore completed!"
-}
-
-send_to_telegram() {
-    local backup_file=$1
-    
-    if [ ! -f "$BOT_CONFIG" ]; then
-        echo "❌ Bot not configured!"
-        return 1
-    fi
-    
-    local token=$(grep TOKEN= "$BOT_CONFIG" | cut -d= -f2)
-    local admins=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
-    local admin_id=$(echo "$admins" | cut -d',' -f1)
-    
-    if [ -z "$token" ] || [ -z "$admin_id" ]; then
-        echo "❌ Bot token or admin ID not set!"
-        return 1
-    fi
-    
-    # Send backup file via Telegram
-    curl -s -F "chat_id=$admin_id" \
-         -F "document=@$backup_file" \
-         -F "caption=📦 Shadow SSH Backup - $(date)" \
-         "https://api.telegram.org/bot$token/sendDocument" >/dev/null
-    
-    echo "✅ Backup sent to Telegram!"
-}
-
-list_backups() {
-    echo ""
-    echo -e "${CYAN}📦 Backup History${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    
-    sqlite3 "$DB" "SELECT id, datetime(backup_time, 'unixepoch', 'localtime'), filename, size FROM backup_history ORDER BY backup_time DESC LIMIT 10;" | while IFS='|' read -r id time filename size; do
-        local size_mb=$(echo "scale=2; $size / 1048576" | bc 2>/dev/null || echo "0")
-        echo -e "  ${GREEN}$id.${NC} $time - ${size_mb}MB"
-        echo -e "     ${YELLOW}$filename${NC}"
+    for iface in $(ls /sys/class/net/ | grep -v lo); do
+        tc class add dev $iface parent 1: classid 1:${speed_kbps} htb rate ${speed_kbps}kbit ceil ${speed_kbps}kbit 2>/dev/null
     done
     
-    echo ""
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo "✅ Rate limit applied: $username = ${speed_kbps}kbps"
+}
+
+process_users() {
+    while IFS='|' read -r username speed_limit; do
+        [ -z "$username" ] && continue
+        [ "$speed_limit" != "0" ] && apply_rate_limit "$username" "$speed_limit"
+    done < <(sqlite3 "$DB" "SELECT username, speed_limit FROM users WHERE status='active';")
 }
 
 case "$1" in
-    backup)
-        echo -e "${YELLOW}📦 Creating backup...${NC}"
-        result=($(create_backup))
-        backup_file="${result[0]}"
-        size_mb="${result[1]}"
-        echo -e "${GREEN}✅ Backup created: ${backup_file} (${size_mb}MB)${NC}"
-        
-        # Auto-send to Telegram if enabled
-        local tele_enabled=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='backup_telegram';")
-        if [ "$tele_enabled" = "enabled" ]; then
-            send_to_telegram "$backup_file"
-        fi
+    apply) process_users ;;
+    set)
+        username=$2
+        speed=$3
+        sqlite3 "$DB" "UPDATE users SET speed_limit = $speed WHERE username='$username';"
+        apply_rate_limit "$username" "$speed"
         ;;
-    restore)
-        echo -e "${YELLOW}📥 Restore Backup${NC}"
-        list_backups
-        echo -n -e "Enter backup ID to restore (or 'cancel'): "
-        read backup_id
-        
-        if [ "$backup_id" != "cancel" ]; then
-            local filename=$(sqlite3 "$DB" "SELECT filename FROM backup_history WHERE id=$backup_id;")
-            if [ -n "$filename" ] && [ -f "$filename" ]; then
-                echo -n -e "${RED}This will overwrite current data! Continue? (y/n): ${NC}"
-                read confirm
-                if [ "$confirm" = "y" ]; then
-                    restore_backup "$filename"
-                fi
-            else
-                echo -e "${RED}❌ Backup file not found!${NC}"
-            fi
-        fi
-        ;;
-    send)
-        echo -e "${YELLOW}📤 Sending latest backup to Telegram...${NC}"
-        local latest=$(sqlite3 "$DB" "SELECT filename FROM backup_history ORDER BY backup_time DESC LIMIT 1;")
-        if [ -n "$latest" ] && [ -f "$latest" ]; then
-            send_to_telegram "$latest"
-        else
-            echo -e "${RED}❌ No backup found! Create one first${NC}"
-        fi
-        ;;
-    list)
-        list_backups
-        ;;
-    auto-backup)
-        while true; do
-            create_backup >/dev/null
-            sleep 86400  # Every 24 hours
-        done
-        ;;
-    *)
-        echo "Backup Manager"
-        echo ""
-        echo "Usage:"
-        echo "  $0 backup     - Create new backup"
-        echo "  $0 restore    - Restore from backup"
-        echo "  $0 send       - Send backup to Telegram"
-        echo "  $0 list       - List all backups"
-        echo "  $0 auto-backup - Start auto-backup (every 24h)"
-        ;;
+    *) echo "Usage: $0 {apply|set <user> <speed_kbps>}" ;;
 esac
-BACKEOF
+RATEEOF
 
-chmod +x /usr/local/bin/backup-manager
+chmod +x /usr/local/bin/rate-limiter
 
 # ============================================
 # Fake Location Script
@@ -596,9 +555,9 @@ cat > /usr/local/bin/fake-location << 'LOCEOF'
 #!/bin/bash
 DB="/var/lib/shadow/traffic.db"
 
-COUNTRY_CODES=("US" "GB" "DE" "NL" "JP" "CA" "FR" "SG" "CH" "SE")
-COUNTRY_NAMES=("United States" "United Kingdom" "Germany" "Netherlands" "Japan" "Canada" "France" "Singapore" "Switzerland" "Sweden")
-COUNTRY_IPS=("8.8.8.8" "1.1.1.1" "9.9.9.9" "1.0.0.1" "1.1.1.2" "8.8.4.4" "9.9.9.10" "1.0.0.2" "8.8.8.9" "1.1.1.3")
+COUNTRY_CODES=("US" "GB" "DE" "NL" "JP" "CA")
+COUNTRY_NAMES=("United States" "United Kingdom" "Germany" "Netherlands" "Japan" "Canada")
+COUNTRY_IPS=("8.8.8.8" "1.1.1.1" "9.9.9.9" "1.0.0.1" "1.1.1.2" "8.8.4.4")
 
 start_fake_location() {
     local country_code=$1
@@ -626,7 +585,6 @@ $fake_ip ipapi.co
 $fake_ip ifconfig.co
 $fake_ip myip.com
 $fake_ip ip.sb
-$fake_ip ipinfo.info
 $fake_ip whatismyip.com
 EOF
     
@@ -644,7 +602,6 @@ stop_fake_location() {
     sed -i '/ifconfig.co/d' /etc/hosts
     sed -i '/myip.com/d' /etc/hosts
     sed -i '/ip.sb/d' /etc/hosts
-    sed -i '/ipinfo.info/d' /etc/hosts
     sed -i '/whatismyip.com/d' /etc/hosts
     
     rm -f /usr/share/GeoIP/fake_location
@@ -828,6 +785,338 @@ AIEOF
 chmod +x /usr/local/bin/ai-optimizer
 
 # ============================================
+# Backup Manager
+# ============================================
+cat > /usr/local/bin/backup-manager << 'BACKEOF'
+#!/bin/bash
+DB="/var/lib/shadow/traffic.db"
+BACKUP_DIR="/var/backups/shadow"
+BOT_CONFIG="/etc/shadow-bot.conf"
+
+create_backup() {
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local backup_file="$BACKUP_DIR/shadow_backup_${timestamp}.tar.gz"
+    
+    mkdir -p "$BACKUP_DIR"
+    
+    tar -czf "$backup_file" \
+        /var/lib/shadow/traffic.db \
+        /etc/shadow-users.conf \
+        /etc/shadow-domain.conf \
+        /etc/shadow-bot.conf \
+        /etc/ssh/sshd_config.d/ 2>/dev/null
+    
+    local size=$(stat -c %s "$backup_file")
+    
+    sqlite3 "$DB" "INSERT INTO backup_history (backup_time, filename, size, type) VALUES ($(date +%s), '$backup_file', $size, 'local');"
+    
+    echo "$backup_file"
+}
+
+restore_backup() {
+    local backup_file=$1
+    
+    if [ ! -f "$backup_file" ]; then
+        echo "❌ Backup file not found!"
+        return 1
+    fi
+    
+    systemctl stop traffic-monitor shadow-bot 2>/dev/null
+    tar -xzf "$backup_file" -C /
+    systemctl start traffic-monitor shadow-bot 2>/dev/null
+    
+    echo "✅ Restore completed!"
+}
+
+send_to_telegram() {
+    local backup_file=$1
+    
+    if [ ! -f "$BOT_CONFIG" ]; then
+        echo "❌ Bot not configured!"
+        return 1
+    fi
+    
+    local token=$(grep TOKEN= "$BOT_CONFIG" | cut -d= -f2)
+    local admins=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
+    local admin_id=$(echo "$admins" | cut -d',' -f1)
+    
+    if [ -z "$token" ] || [ -z "$admin_id" ]; then
+        echo "❌ Bot token or admin ID not set!"
+        return 1
+    fi
+    
+    curl -s -F "chat_id=$admin_id" \
+         -F "document=@$backup_file" \
+         -F "caption=📦 Shadow SSH Backup - $(date)" \
+         "https://api.telegram.org/bot$token/sendDocument" >/dev/null
+    
+    echo "✅ Backup sent to Telegram!"
+}
+
+list_backups() {
+    echo ""
+    echo -e "${CYAN}📦 Backup History${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    
+    sqlite3 "$DB" "SELECT id, datetime(backup_time, 'unixepoch', 'localtime'), filename, size FROM backup_history ORDER BY backup_time DESC LIMIT 10;" | while IFS='|' read -r id time filename size; do
+        local size_mb=$(echo "scale=2; $size / 1048576" | bc 2>/dev/null || echo "0")
+        echo -e "  ${GREEN}$id.${NC} $time - ${size_mb}MB"
+        echo -e "     ${YELLOW}$filename${NC}"
+    done
+    
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+case "$1" in
+    backup)
+        echo -e "${YELLOW}📦 Creating backup...${NC}"
+        backup_file=$(create_backup)
+        echo -e "${GREEN}✅ Backup created: ${backup_file}${NC}"
+        
+        local tele_enabled=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='backup_telegram';")
+        if [ "$tele_enabled" = "enabled" ]; then
+            send_to_telegram "$backup_file"
+        fi
+        ;;
+    restore)
+        echo -e "${YELLOW}📥 Restore Backup${NC}"
+        list_backups
+        echo -n -e "Enter backup ID (or 'cancel'): "
+        read backup_id
+        
+        if [ "$backup_id" != "cancel" ]; then
+            local filename=$(sqlite3 "$DB" "SELECT filename FROM backup_history WHERE id=$backup_id;")
+            if [ -n "$filename" ] && [ -f "$filename" ]; then
+                echo -n -e "${RED}This will overwrite current data! Continue? (y/n): ${NC}"
+                read confirm
+                if [ "$confirm" = "y" ]; then
+                    restore_backup "$filename"
+                fi
+            else
+                echo -e "${RED}❌ Backup file not found!${NC}"
+            fi
+        fi
+        ;;
+    send)
+        echo -e "${YELLOW}📤 Sending latest backup to Telegram...${NC}"
+        local latest=$(sqlite3 "$DB" "SELECT filename FROM backup_history ORDER BY backup_time DESC LIMIT 1;")
+        if [ -n "$latest" ] && [ -f "$latest" ]; then
+            send_to_telegram "$latest"
+        else
+            echo -e "${RED}❌ No backup found!${NC}"
+        fi
+        ;;
+    list)
+        list_backups
+        ;;
+    auto-backup)
+        while true; do
+            create_backup >/dev/null
+            sleep 86400
+        done
+        ;;
+    *)
+        echo "Backup Manager"
+        echo "Usage: $0 {backup|restore|send|list|auto-backup}"
+        ;;
+esac
+BACKEOF
+
+chmod +x /usr/local/bin/backup-manager
+
+# ============================================
+# PING-NET Debug Tool
+# ============================================
+cat > /usr/local/bin/ping-net << 'PINGEOF'
+#!/bin/bash
+DB="/var/lib/shadow/traffic.db"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+debug_user() {
+    local username=$1
+    
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}   🔍 PING-NET TRAFFIC DEBUG: ${GREEN}$username${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    
+    echo -e "${YELLOW}📊 Active PIDs for $username:${NC}"
+    echo -e "${BLUE}─────────────────────────────────────────${NC}"
+    
+    local pids=$(pgrep -u "$username" 2>/dev/null)
+    
+    if [ -z "$pids" ]; then
+        echo -e "  ${RED}No active PIDs found!${NC}"
+    else
+        for pid in $pids; do
+            local comm=$(cat /proc/$pid/comm 2>/dev/null || echo "N/A")
+            local is_ssh="NO"
+            
+            if echo "$comm" | grep -q "sshd"; then
+                is_ssh="${GREEN}YES${NC}"
+            fi
+            
+            local rx=0
+            local tx=0
+            if [ -f "/proc/$pid/net/dev" ]; then
+                rx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$2} END {print s+0}')
+                tx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$10} END {print s+0}')
+            fi
+            
+            local db_usage=$(sqlite3 "$DB" "SELECT COALESCE(accumulated_bytes, 0) FROM traffic_records WHERE pid=$pid AND username='$username' AND status='active';")
+            
+            local rx_mb=$(echo "scale=2; $rx / 1048576" | bc 2>/dev/null || echo "0")
+            local tx_mb=$(echo "scale=2; $tx / 1048576" | bc 2>/dev/null || echo "0")
+            local db_mb=$(echo "scale=2; $db_usage / 1048576" | bc 2>/dev/null || echo "0")
+            
+            echo -e "  ${GREEN}PID:${NC} $pid | ${GREEN}Comm:${NC} $comm | ${GREEN}SSH:${NC} $is_ssh"
+            echo -e "    /proc rx: ${rx_mb}MB | tx: ${tx_mb}MB | total: $(echo "$rx_mb + $tx_mb" | bc)MB"
+            echo -e "    DB recorded: ${db_mb}MB"
+            
+            local record_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM traffic_records WHERE pid=$pid AND username='$username';")
+            if [ "$record_count" -gt 1 ]; then
+                echo -e "    ${RED}⚠️  DUPLICATE RECORDS: $record_count entries for PID $pid${NC}"
+            fi
+            
+            echo ""
+        done
+    fi
+    
+    echo -e "${YELLOW}📊 Database Records for $username:${NC}"
+    echo -e "${BLUE}─────────────────────────────────────────${NC}"
+    
+    local total_records=$(sqlite3 "$DB" "SELECT COUNT(*) FROM traffic_records WHERE username='$username';")
+    local active_records=$(sqlite3 "$DB" "SELECT COUNT(*) FROM traffic_records WHERE username='$username' AND status='active';")
+    
+    echo -e "  Total records: $total_records"
+    echo -e "  Active: ${GREEN}$active_records${NC}"
+    
+    echo ""
+    echo -e "${YELLOW}🔍 Checking for duplicate PIDs...${NC}"
+    echo -e "${BLUE}─────────────────────────────────────────${NC}"
+    
+    local duplicates=$(sqlite3 "$DB" "SELECT pid, COUNT(*) as cnt FROM traffic_records WHERE username='$username' GROUP BY pid HAVING cnt > 1;")
+    
+    if [ -n "$duplicates" ]; then
+        echo -e "${RED}⚠️  DUPLICATE PIDs FOUND:${NC}"
+        echo "$duplicates" | while IFS='|' read -r pid count; do
+            echo -e "    PID $pid: ${RED}$count records${NC}"
+        done
+        echo ""
+        echo -e "${RED}💡 FIX: Run 'ping-net fix $username' to remove duplicates${NC}"
+    else
+        echo -e "${GREEN}✅ No duplicate PIDs found!${NC}"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}📊 Traffic Summary:${NC}"
+    echo -e "${BLUE}─────────────────────────────────────────${NC}"
+    
+    local total_from_proc=0
+    for pid in $pids; do
+        if [ -f "/proc/$pid/net/dev" ]; then
+            local rx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$2} END {print s+0}')
+            local tx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$10} END {print s+0}')
+            total_from_proc=$((total_from_proc + rx + tx))
+        fi
+    done
+    
+    local total_from_db=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');")
+    local current_used=$(sqlite3 "$DB" "SELECT used_traffic FROM users WHERE username='$username';")
+    
+    local proc_mb=$(echo "scale=2; $total_from_proc / 1048576" | bc 2>/dev/null || echo "0")
+    local db_mb=$(echo "scale=2; $total_from_db / 1048576" | bc 2>/dev/null || echo "0")
+    local used_mb=$(echo "scale=2; $current_used / 1048576" | bc 2>/dev/null || echo "0")
+    
+    echo -e "  /proc/net real traffic: ${GREEN}${proc_mb}MB${NC}"
+    echo -e "  Database sum: ${YELLOW}${db_mb}MB${NC}"
+    echo -e "  User table used: ${CYAN}${used_mb}MB${NC}"
+    
+    if [ "$total_from_db" -gt "$total_from_proc" ]; then
+        local diff=$((total_from_db - total_from_proc))
+        local diff_mb=$(echo "scale=2; $diff / 1048576" | bc 2>/dev/null || echo "0")
+        echo -e "  ${RED}⚠️  OVERCOUNT: Database shows ${diff_mb}MB MORE than real traffic!${NC}"
+    else
+        echo -e "  ${GREEN}✅ Traffic counting is accurate${NC}"
+    fi
+    
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+fix_duplicates() {
+    local username=$1
+    
+    echo ""
+    echo -e "${YELLOW}🔧 Fixing duplicate records for $username...${NC}"
+    
+    local duplicates=$(sqlite3 "$DB" "SELECT pid FROM traffic_records WHERE username='$username' GROUP BY pid HAVING COUNT(*) > 1;")
+    
+    if [ -z "$duplicates" ]; then
+        echo -e "${GREEN}✅ No duplicates to fix!${NC}"
+        return
+    fi
+    
+    for pid in $duplicates; do
+        echo -e "  Fixing PID $pid..."
+        
+        local first_id=$(sqlite3 "$DB" "SELECT id FROM traffic_records WHERE username='$username' AND pid=$pid ORDER BY id ASC LIMIT 1;")
+        local total_bytes=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND pid=$pid;")
+        
+        sqlite3 "$DB" "UPDATE traffic_records SET accumulated_bytes = $total_bytes WHERE id = $first_id;"
+        sqlite3 "$DB" "DELETE FROM traffic_records WHERE username='$username' AND pid=$pid AND id != $first_id;"
+        
+        echo -e "    ${GREEN}✅ Fixed: Merged into record #$first_id ($(echo "scale=2; $total_bytes / 1048576" | bc)MB)${NC}"
+    done
+    
+    echo -e "${GREEN}✅ All duplicates fixed!${NC}"
+}
+
+case "$1" in
+    debug|user)
+        if [ -z "$2" ]; then
+            echo "Usage: ping-net debug <username>"
+            exit 1
+        fi
+        debug_user "$2"
+        ;;
+    fix)
+        if [ -z "$2" ]; then
+            echo "Usage: ping-net fix <username>"
+            exit 1
+        fi
+        fix_duplicates "$2"
+        ;;
+    all)
+        echo -e "${CYAN}🔍 Scanning all users...${NC}"
+        while IFS='|' read -r username; do
+            [ -z "$username" ] && continue
+            debug_user "$username"
+        done < <(sqlite3 "$DB" "SELECT username FROM users;")
+        ;;
+    *)
+        echo "PING-NET Traffic Debugger"
+        echo ""
+        echo "Usage:"
+        echo "  ping-net debug <username>  - Debug specific user"
+        echo "  ping-net fix <username>    - Fix duplicate records"
+        echo "  ping-net all               - Debug all users"
+        echo ""
+        echo "This tool helps find why traffic is counted multiple times"
+        ;;
+esac
+PINGEOF
+
+chmod +x /usr/local/bin/ping-net
+
+# ============================================
 # AI Config Checker
 # ============================================
 cat > /usr/local/bin/config-checker << 'CHECKEOF'
@@ -847,40 +1136,34 @@ check_all_configs() {
     echo -e "${CYAN}   🤖 AI CONFIG CHECKER${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${YELLOW}Checking all user configs...${NC}"
-    echo ""
     
     while IFS='|' read -r username password status expiry; do
         [ -z "$username" ] && continue
         
         echo -e "${GREEN}▸ Checking: $username${NC}"
         
-        # Check 1: User exists in system
         if id "$username" &>/dev/null; then
             echo -e "  ✅ System user: ${GREEN}OK${NC}"
         else
             echo -e "  ❌ System user: ${RED}MISSING${NC}"
         fi
         
-        # Check 2: SSH config exists
         if [ -f "/etc/ssh/sshd_config.d/${username}.conf" ]; then
             echo -e "  ✅ SSH config: ${GREEN}OK${NC}"
         else
             echo -e "  ❌ SSH config: ${RED}MISSING${NC}"
         fi
         
-        # Check 3: Port 22 accessible
         if nc -z -w1 localhost 22 2>/dev/null; then
             echo -e "  ✅ Port 22: ${GREEN}OPEN${NC}"
         else
             echo -e "  ❌ Port 22: ${RED}CLOSED${NC}"
         fi
         
-        # Check 4: Expiry status
         if [ "$expiry" != "0" ]; then
             local days_left=$(( (expiry - $(date +%s)) / 86400 ))
             if [ $days_left -lt 0 ]; then
-                echo -e "  ⚠️  Expiry: ${RED}EXPIRED ($days_left days)${NC}"
+                echo -e "  ⚠️  Expiry: ${RED}EXPIRED${NC}"
             elif [ $days_left -lt 3 ]; then
                 echo -e "  ⚠️  Expiry: ${YELLOW}SOON ($days_left days)${NC}"
             else
@@ -889,9 +1172,6 @@ check_all_configs() {
         else
             echo -e "  ✅ Expiry: ${GREEN}Unlimited${NC}"
         fi
-        
-        # Check 5: Config link test
-        echo -e "  🔗 Config: ${BLUE}npvt-ssh://...${NC}"
         
         echo ""
     done < <(sqlite3 "$DB" "SELECT username, password, status, expiry FROM users;")
@@ -904,286 +1184,16 @@ check_all_configs() {
     read
 }
 
-check_single_config() {
-    local username=$1
-    local password=$2
-    
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}   🤖 AI Config Check: ${GREEN}$username${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    
-    # Test SSH connection
-    echo -e "${YELLOW}Testing SSH connection...${NC}"
-    timeout 5 sshpass -p "$password" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 "$username@localhost" -p 22 "echo OK" 2>/dev/null
-    
-    if [ $? -eq 0 ]; then
-        echo -e "  ✅ SSH Connection: ${GREEN}SUCCESS${NC}"
-    else
-        echo -e "  ❌ SSH Connection: ${RED}FAILED${NC}"
-    fi
-    
-    echo ""
-    echo -n "Press Enter to continue..."
-    read
-}
-
 case "$1" in
-    all)
-        check_all_configs
-        ;;
-    single)
-        echo -n -e "Username: "
-        read username
-        local password=$(sqlite3 "$DB" "SELECT password FROM users WHERE username='$username';")
-        if [ -n "$password" ]; then
-            check_single_config "$username" "$password"
-        else
-            echo -e "${RED}❌ User not found!${NC}"
-        fi
-        ;;
-    *)
-        echo "AI Config Checker"
-        echo "Usage: $0 {all|single}"
-        ;;
+    all) check_all_configs ;;
+    *) echo "Usage: $0 all" ;;
 esac
 CHECKEOF
 
 chmod +x /usr/local/bin/config-checker
 
 # ============================================
-# Smart Config Generator (NapsternetV + V2Ray only)
-# ============================================
-cat > /usr/local/bin/config-generator << 'GENEOF'
-#!/bin/bash
-DB="/var/lib/shadow/traffic.db"
-DOMAIN_FILE="/etc/shadow-domain.conf"
-
-get_domain() {
-    [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ] && cat "$DOMAIN_FILE" || curl -s ifconfig.me
-}
-
-generate_napsternetv() {
-    local server=$1
-    local username=$2
-    local password=$3
-    local days_left=$4
-    local traffic_gb=$5
-    
-    local remarks="📡 $username"
-    [ -n "$days_left" ] && [ "$days_left" != "∞" ] && remarks="$remarks | ⏰ ${days_left}d"
-    [ -n "$traffic_gb" ] && [ "$traffic_gb" != "∞" ] && remarks="$remarks | 📎 ${traffic_gb}GB"
-    
-    local config_json="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"$remarks\",\"sshHost\":\"$server\",\"sshPort\":22,\"sshUsername\":\"$username\",\"sshPassword\":\"$password\",\"udpgwTransparentDNS\":true}"
-    local config_b64=$(echo -n "$config_json" | base64 -w 0)
-    echo "npvt-ssh://${config_b64}"
-}
-
-generate_v2ray() {
-    local server=$1
-    local username=$2
-    local password=$3
-    local days_left=$4
-    
-    local remarks="SSH-$username"
-    [ -n "$days_left" ] && [ "$days_left" != "∞" ] && remarks="$remarks-${days_left}d"
-    
-    local uuid=$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "370f9e58-f853-48e5-8fd5-5c182416aee4")
-    
-    echo "vless://${uuid}@${server}:22?encryption=none&security=tls&sni=${server}&fp=chrome&alpn=h2%2Chttp%2F1.1&type=xhttp&host=${server}&path=/api&mode=auto#${remarks}"
-}
-
-show_menu() {
-    local server=$(get_domain)
-    
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}   📱 SMART CONFIG GENERATOR${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -e "Server: ${GREEN}${server}:22${NC}"
-    echo ""
-    echo -e "Select Protocol:"
-    echo ""
-    echo -e "  ${GREEN}1.${NC} NapsternetV (NP VT)"
-    echo -e "  ${GREEN}2.${NC} V2Ray (vless)"
-    echo ""
-    echo -n -e "${YELLOW}Select [1-2]: ${NC}"
-    read protocol_choice
-    echo ""
-    
-    case $protocol_choice in
-        1)
-            echo -e "${YELLOW}═══ NapsternetV Config ═══${NC}"
-            echo ""
-            echo -e "Select user source:"
-            echo -e "  ${GREEN}1.${NC} Generate for existing user"
-            echo -e "  ${GREEN}2.${NC} Create new user + generate config"
-            echo ""
-            echo -n -e "${YELLOW}Select [1-2]: ${NC}"
-            read user_choice
-            
-            if [ "$user_choice" = "1" ]; then
-                echo ""
-                echo -e "${CYAN}Existing Users:${NC}"
-                sqlite3 "$DB" "SELECT username FROM users WHERE status='active';" | while read user; do
-                    echo -e "  - $user"
-                done
-                echo ""
-                echo -n -e "${GREEN}Username: ${NC}"
-                read username
-                
-                local password=$(sqlite3 "$DB" "SELECT password FROM users WHERE username='$username';")
-                local expiry=$(sqlite3 "$DB" "SELECT expiry FROM users WHERE username='$username';")
-                local traffic=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$username';")
-                
-                if [ -n "$password" ]; then
-                    local days_left="∞"
-                    [ "$expiry" != "0" ] && days_left=$(( (expiry - $(date +%s)) / 86400 ))
-                    
-                    local traffic_gb="∞"
-                    [ "$traffic" != "0" ] && traffic_gb=$(echo "scale=0; $traffic / 1073741824" | bc)
-                    
-                    echo ""
-                    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo -e "${PURPLE}   📋 YOUR CONFIG${NC}"
-                    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo ""
-                    generate_napsternetv "$server" "$username" "$password" "$days_left" "$traffic_gb"
-                    echo ""
-                    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                else
-                    echo -e "${RED}❌ User not found!${NC}"
-                fi
-            else
-                echo ""
-                echo -n -e "${GREEN}👤 Username: ${NC}"
-                read username
-                echo -n -e "${GREEN}🔑 Password: ${NC}"
-                read password
-                echo -n -e "${GREEN}📊 Traffic (GB, 0=∞): ${NC}"
-                read traffic_gb_input
-                echo -n -e "${GREEN}⏰ Days (0=∞): ${NC}"
-                read days_input
-                echo -n -e "${GREEN}🔢 Max Conn: ${NC}"
-                read max_conn
-                
-                [ "$traffic_gb_input" -eq 0 ] && traffic_bytes=0 || traffic_bytes=$((traffic_gb_input * 1073741824))
-                [ "$days_input" -eq 0 ] && expiry=0 || expiry=$(date -d "+${days_input} days" +%s)
-                [ -z "$max_conn" ] && max_conn=1
-                
-                useradd -m -s /bin/false "$username" 2>/dev/null
-                echo "$username:$password" | chpasswd
-                
-                cat > "/etc/ssh/sshd_config.d/${username}.conf" << EOFCONF
-MaxSessions $max_conn
-MaxStartups $max_conn
-EOFCONF
-                
-                echo "$username" >> /etc/shadow-users.conf 2>/dev/null
-                sqlite3 "$DB" "INSERT INTO users (username, password, total_traffic, expiry, created, user_limit) VALUES ('$username', '$password', $traffic_bytes, $expiry, $(date +%s), $max_conn);"
-                
-                systemctl restart sshd 2>/dev/null
-                
-                local days_left="∞"
-                [ "$days_input" != "0" ] && days_left="$days_input"
-                
-                echo ""
-                echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo -e "${PURPLE}   📋 YOUR CONFIG${NC}"
-                echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo ""
-                generate_napsternetv "$server" "$username" "$password" "$days_left" "$traffic_gb_input"
-                echo ""
-                echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            fi
-            ;;
-        2)
-            echo -e "${YELLOW}═══ V2Ray Config ═══${NC}"
-            echo ""
-            echo -e "Select user source:"
-            echo -e "  ${GREEN}1.${NC} Generate for existing user"
-            echo -e "  ${GREEN}2.${NC} Create new user + generate config"
-            echo ""
-            echo -n -e "${YELLOW}Select [1-2]: ${NC}"
-            read user_choice
-            
-            if [ "$user_choice" = "1" ]; then
-                echo ""
-                echo -e "${CYAN}Existing Users:${NC}"
-                sqlite3 "$DB" "SELECT username FROM users WHERE status='active';" | while read user; do
-                    echo -e "  - $user"
-                done
-                echo ""
-                echo -n -e "${GREEN}Username: ${NC}"
-                read username
-                
-                local password=$(sqlite3 "$DB" "SELECT password FROM users WHERE username='$username';")
-                local expiry=$(sqlite3 "$DB" "SELECT expiry FROM users WHERE username='$username';")
-                
-                if [ -n "$password" ]; then
-                    local days_left="∞"
-                    [ "$expiry" != "0" ] && days_left=$(( (expiry - $(date +%s)) / 86400 ))
-                    
-                    echo ""
-                    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo -e "${PURPLE}   📋 YOUR CONFIG${NC}"
-                    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo ""
-                    generate_v2ray "$server" "$username" "$password" "$days_left"
-                    echo ""
-                    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                fi
-            else
-                echo ""
-                echo -n -e "${GREEN}👤 Username: ${NC}"
-                read username
-                echo -n -e "${GREEN}🔑 Password: ${NC}"
-                read password
-                echo -n -e "${GREEN}⏰ Days (0=∞): ${NC}"
-                read days_input
-                
-                [ "$days_input" -eq 0 ] && expiry=0 || expiry=$(date -d "+${days_input} days" +%s)
-                
-                useradd -m -s /bin/false "$username" 2>/dev/null
-                echo "$username:$password" | chpasswd
-                
-                echo "$username" >> /etc/shadow-users.conf 2>/dev/null
-                sqlite3 "$DB" "INSERT INTO users (username, password, total_traffic, expiry, created, user_limit) VALUES ('$username', '$password', 0, $expiry, $(date +%s), 1);"
-                
-                systemctl restart sshd 2>/dev/null
-                
-                local days_left="∞"
-                [ "$days_input" != "0" ] && days_left="$days_input"
-                
-                echo ""
-                echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo -e "${PURPLE}   📋 YOUR CONFIG${NC}"
-                echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo ""
-                generate_v2ray "$server" "$username" "$password" "$days_left"
-                echo ""
-                echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            fi
-            ;;
-        *)
-            echo -e "${RED}❌ Invalid choice!${NC}"
-            ;;
-    esac
-    
-    echo ""
-    echo -n "Press Enter to continue..."
-    read
-}
-
-show_menu
-GENEOF
-
-chmod +x /usr/local/bin/config-generator
-
-# ============================================
-# Traffic Monitor
+# Traffic Monitor (with Half-Price + Dedup + Conntrack)
 # ============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
@@ -1225,6 +1235,15 @@ get_user_ssh_pids() {
     echo "$ssh_pids"
 }
 
+get_dest_ip_for_pid() {
+    local pid=$1
+    # Use ss to get destination IP for this PID
+    ss -tnp | grep "pid=$pid" | awk '{print $5}' | cut -d: -f1 | head -1
+}
+
+echo "🔄 HAKIM Traffic Monitor Started (PID: $$)"
+echo "   Mode: Real SSH + Half-Price Iranian + Dedup"
+
 while true; do
     active_users=$(sqlite3 "$DB" "SELECT username FROM users WHERE status='active';")
     
@@ -1252,13 +1271,25 @@ while true; do
         
         for pid in $current_pids; do
             is_real_ssh_session "$pid" "$username" || continue
+            
             read -r rx_now tx_now <<< $(read_pid_traffic "$pid")
             ppid=$(cat /proc/$pid/stat 2>/dev/null | awk '{print $4}')
+            
+            # Get destination IP for half-price detection
+            dest_ip=$(get_dest_ip_for_pid "$pid")
+            is_iranian=0
+            
+            if [ -n "$dest_ip" ]; then
+                # Check if Iranian
+                if /usr/local/bin/half-price check "$dest_ip" 2>/dev/null | grep -q "✅"; then
+                    is_iranian=1
+                fi
+            fi
             
             existing=$(sqlite3 "$DB" "SELECT pid FROM traffic_records WHERE pid=$pid AND ppid=$ppid AND status='active';")
             
             if [ -z "$existing" ]; then
-                sqlite3 "$DB" "INSERT OR IGNORE INTO traffic_records (username, pid, ppid, start_time, last_rx_bytes, last_tx_bytes, accumulated_bytes, status) VALUES ('$username', $pid, $ppid, $current_time, $rx_now, $tx_now, 0, 'active');"
+                sqlite3 "$DB" "INSERT OR IGNORE INTO traffic_records (username, pid, ppid, dest_ip, is_iranian, start_time, last_rx_bytes, last_tx_bytes, accumulated_bytes, status) VALUES ('$username', $pid, $ppid, '$dest_ip', $is_iranian, $current_time, $rx_now, $tx_now, 0, 'active');"
             else
                 last_rx=$(sqlite3 "$DB" "SELECT last_rx_bytes FROM traffic_records WHERE pid=$pid AND ppid=$ppid AND status='active';")
                 last_tx=$(sqlite3 "$DB" "SELECT last_tx_bytes FROM traffic_records WHERE pid=$pid AND ppid=$ppid AND status='active';")
@@ -1269,15 +1300,29 @@ while true; do
                 [ $diff_rx -lt 0 ] || [ $diff_tx -lt 0 ] && { sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes=0 WHERE pid=$pid AND ppid=$ppid;"; continue; }
                 [ $diff_rx -gt 524288000 ] || [ $diff_tx -gt 524288000 ] && { sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid AND ppid=$ppid;"; continue; }
                 
-                [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ] && sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $((diff_rx + diff_tx)) WHERE pid=$pid AND ppid=$ppid;"
+                if [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ]; then
+                    new_bytes=$((diff_rx + diff_tx))
+                    
+                    # Apply half-price if Iranian destination
+                    if [ $is_iranian -eq 1 ]; then
+                        half_bytes=$((new_bytes / 2))
+                        sqlite3 "$DB" "UPDATE users SET iranian_traffic = iranian_traffic + $new_bytes, half_price_traffic = half_price_traffic + $new_bytes, used_traffic = used_traffic + $half_bytes WHERE username='$username';"
+                    else
+                        sqlite3 "$DB" "UPDATE users SET foreign_traffic = foreign_traffic + $new_bytes, used_traffic = used_traffic + $new_bytes WHERE username='$username';"
+                    fi
+                    
+                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $new_bytes, is_iranian=$is_iranian, dest_ip='$dest_ip' WHERE pid=$pid AND ppid=$ppid;"
+                fi
             fi
         done
         
         total_usage=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');")
-        sqlite3 "$DB" "UPDATE users SET used_traffic = $total_usage WHERE username='$username';"
+        sqlite3 "$DB" "UPDATE users SET used_traffic = (iranian_traffic / 2) + foreign_traffic WHERE username='$username';"
         
         total_limit=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$username';")
-        [ "$total_limit" != "0" ] && [ "$total_usage" -ge "$total_limit" ] && {
+        current_used=$(sqlite3 "$DB" "SELECT used_traffic FROM users WHERE username='$username';")
+        
+        [ "$total_limit" != "0" ] && [ "$current_used" -ge "$total_limit" ] && {
             sqlite3 "$DB" "UPDATE users SET status='limited' WHERE username='$username';"
             pkill -9 -u "$username" 2>/dev/null
             sqlite3 "$DB" "UPDATE traffic_records SET status='killed' WHERE username='$username' AND status='active';"
@@ -1291,7 +1336,7 @@ MONITOREOF
 chmod +x /usr/local/bin/traffic-monitor
 
 # ============================================
-# Telegram Bot (with Backup feature)
+# Telegram Bot
 # ============================================
 cat > /usr/local/bin/shadow-bot << 'BOTEOF'
 #!/usr/bin/env python3
@@ -1367,20 +1412,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("➕ Create User", callback_data="create_user")],
         [InlineKeyboardButton("🗑 Delete User", callback_data="delete_menu")],
         [InlineKeyboardButton("📱 Config Generator", callback_data="config_gen")],
+        [InlineKeyboardButton("🇮🇷 Half-Price Status", callback_data="half_price")],
         [InlineKeyboardButton("📦 Backup/Restore", callback_data="backup_menu")],
-        [InlineKeyboardButton("🤖 AI Check Configs", callback_data="ai_check")],
         [InlineKeyboardButton("📈 Server Status", callback_data="status")],
         [InlineKeyboardButton("🔄 Refresh", callback_data="refresh")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        f"🔱 *Shadow SSH v22.0 GOD MODE*\n"
+        f"🔱 *Shadow SSH v25.0 HAKIM*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🌐 `{get_domain()}:22`\n"
-        f"🛡️ Obfuscator\n"
-        f"📦 Backup System\n"
-        f"🤖 AI Checker\n"
+        f"🇮🇷 Half-Price Iranian Sites\n"
+        f"🛡️ Anti-Duplication\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"Select option:",
         reply_markup=reply_markup,
@@ -1399,8 +1443,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_users(query)
     elif query.data == "create_user":
         await show_create_dialog(query)
-    elif query.data == "traffic":
-        await show_traffic(query)
     elif query.data == "status":
         await show_status(query)
     elif query.data == "refresh":
@@ -1420,10 +1462,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_backup_menu(query)
     elif query.data == "backup_create":
         await create_backup_action(query)
-    elif query.data == "backup_restore":
-        await restore_backup_action(query)
-    elif query.data == "ai_check":
-        await ai_check_configs(query)
+    elif query.data == "half_price":
+        await show_half_price_status(query)
 
 async def show_main_menu(query):
     keyboard = [
@@ -1431,13 +1471,13 @@ async def show_main_menu(query):
         [InlineKeyboardButton("➕ Create User", callback_data="create_user")],
         [InlineKeyboardButton("🗑 Delete User", callback_data="delete_menu")],
         [InlineKeyboardButton("📱 Config Generator", callback_data="config_gen")],
+        [InlineKeyboardButton("🇮🇷 Half-Price Status", callback_data="half_price")],
         [InlineKeyboardButton("📦 Backup/Restore", callback_data="backup_menu")],
-        [InlineKeyboardButton("🤖 AI Check Configs", callback_data="ai_check")],
         [InlineKeyboardButton("📈 Server Status", callback_data="status")],
         [InlineKeyboardButton("🔄 Refresh", callback_data="refresh")]
     ]
     await query.edit_message_text(
-        f"🔱 *Shadow SSH v22.0*\n🌐 `{get_domain()}:22`\nSelect option:",
+        f"🔱 *Shadow SSH v25.0*\n🌐 `{get_domain()}:22`\nSelect option:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='Markdown'
     )
@@ -1445,7 +1485,7 @@ async def show_main_menu(query):
 async def show_users(query):
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
-    cursor.execute("SELECT username, status, used_traffic, total_traffic, expiry, user_limit FROM users")
+    cursor.execute("SELECT username, status, used_traffic, total_traffic, expiry, user_limit, iranian_traffic, foreign_traffic FROM users")
     users = cursor.fetchall()
     conn.close()
     
@@ -1455,9 +1495,11 @@ async def show_users(query):
     
     message = "👥 *Active Users*\n━━━━━━━━━━━━━━━━━━━\n\n"
     for user in users:
-        username, status, used, total, expiry, limit = user
+        username, status, used, total, expiry, limit, iranian, foreign = user
         used_mb = used / 1048576.0
         total_gb = total / 1073741824.0 if total > 0 else 0
+        iranian_mb = iranian / 1048576.0
+        foreign_mb = foreign / 1048576.0
         
         if expiry == 0:
             days_left = "∞"
@@ -1477,10 +1519,16 @@ async def show_users(query):
         
         message += f"{status_emoji} `{username}`\n"
         message += f"   📊 {usage_text}\n"
+        message += f"   🇮🇷 {iranian_mb:.1f}MB (half) | 🌍 {foreign_mb:.1f}MB (full)\n"
         message += f"   ⏰ {days_left} | 🔗 {limit}\n\n"
     
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
     await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+
+async def show_half_price_status(query):
+    result = subprocess.run(["/usr/local/bin/half-price", "status"], capture_output=True, text=True)
+    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
+    await query.edit_message_text(f"🇮🇷 *Half-Price Status*\n\n```\n{result.stdout}\n```", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def show_create_dialog(query):
     await query.edit_message_text(
@@ -1535,6 +1583,8 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🌐 `{domain}:22`\n"
             f"👤 `{username}`\n🔑 `{password}`\n"
             f"📊 `{traffic_gb}GB`\n⏰ `{days}d`\n🔗 `{max_conn}`\n\n"
+            f"🇮🇷 Iranian sites: HALF PRICE\n"
+            f"🌍 Foreign sites: FULL PRICE\n\n"
             f"*NapsternetV:*\n`{npvt_link}`\n\n"
             f"*V2Ray:*\n`{v2ray_link}`",
             parse_mode='Markdown'
@@ -1576,11 +1626,7 @@ async def show_config_options(query):
         [InlineKeyboardButton("2. V2Ray (vless)", callback_data="config_v2ray")],
         [InlineKeyboardButton("🔙 Back", callback_data="refresh")]
     ]
-    await query.edit_message_text(
-        "📱 *Select Protocol:*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='Markdown'
-    )
+    await query.edit_message_text("📱 *Select Protocol:*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def generate_nap_config(query):
     conn = sqlite3.connect(DB)
@@ -1601,15 +1647,7 @@ async def generate_nap_config(query):
     
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="config_gen")])
     
-    # Store user data temporarily
-    context = query
-    context.user_data['nap_users'] = {u[0]: {'password': u[1], 'expiry': u[2], 'traffic': u[3]} for u in users}
-    
-    await query.edit_message_text(
-        "📱 *Select user for NapsternetV config:*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='Markdown'
-    )
+    await query.edit_message_text("📱 *Select user:*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def generate_v2ray_config(query):
     conn = sqlite3.connect(DB)
@@ -1629,73 +1667,18 @@ async def generate_v2ray_config(query):
     
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="config_gen")])
     
-    await query.edit_message_text(
-        "📱 *Select user for V2Ray config:*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='Markdown'
-    )
+    await query.edit_message_text("📱 *Select user:*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def show_backup_menu(query):
     keyboard = [
-        [InlineKeyboardButton("📦 Create Backup Now", callback_data="backup_create")],
-        [InlineKeyboardButton("📤 Send Backup to Telegram", callback_data="backup_send")],
-        [InlineKeyboardButton("📥 Restore from Backup", callback_data="backup_restore")],
+        [InlineKeyboardButton("📦 Create Backup", callback_data="backup_create")],
         [InlineKeyboardButton("🔙 Back", callback_data="refresh")]
     ]
-    
-    # Get latest backup info
-    conn = sqlite3.connect(DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT datetime(backup_time, 'unixepoch', 'localtime'), filename FROM backup_history ORDER BY backup_time DESC LIMIT 1")
-    latest = cursor.fetchone()
-    conn.close()
-    
-    msg = "📦 *Backup & Restore*\n━━━━━━━━━━━━━━━━━━━\n\n"
-    if latest:
-        msg += f"Last backup: `{latest[0]}`\n"
-    else:
-        msg += "No backups yet\n"
-    
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    await query.edit_message_text("📦 *Backup Menu*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def create_backup_action(query):
-    await query.edit_message_text("📦 Creating backup...")
-    
     result = subprocess.run(["/usr/local/bin/backup-manager", "backup"], capture_output=True, text=True)
-    
-    keyboard = [[InlineKeyboardButton("📤 Send to Telegram", callback_data="backup_send")],
-                [InlineKeyboardButton("🔙 Back", callback_data="backup_menu")]]
-    
-    await query.edit_message_text(
-        f"📦 *Backup Result*\n━━━━━━━━━━━━━━━━━━━\n\n{result.stdout}",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='Markdown'
-    )
-
-async def restore_backup_action(query):
-    await query.edit_message_text("📥 Restore feature - Use CLI:\n`/usr/local/bin/backup-manager restore`", parse_mode='Markdown')
-
-async def ai_check_configs(query):
-    result = subprocess.run(["/usr/local/bin/config-checker", "all"], capture_output=True, text=True)
-    await query.edit_message_text(f"🤖 *AI Config Check*\n\n```\n{result.stdout[:3000]}\n```", parse_mode='Markdown')
-
-async def show_traffic(query):
-    conn = sqlite3.connect(DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT username, SUM(accumulated_bytes) as total FROM traffic_records WHERE start_time > ? GROUP BY username ORDER BY total DESC LIMIT 10", [int(time.time()) - 86400])
-    data = cursor.fetchall()
-    conn.close()
-    
-    if not data:
-        await query.edit_message_text("📊 No traffic today!")
-        return
-    
-    message = "📊 *Today's Traffic*\n━━━━━━━━━━━━━━━━━━━\n\n"
-    for i, (user, total) in enumerate(data, 1):
-        message += f"{i}. `{user}`: {total/1048576:.2f}MB\n"
-    
-    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
-    await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    await query.edit_message_text(f"📦 *Backup Created*\n\n{result.stdout}", parse_mode='Markdown')
 
 async def show_status(query):
     cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1")
@@ -1708,8 +1691,7 @@ async def show_status(query):
     location_status = conn.execute("SELECT value FROM settings WHERE key='fake_location'").fetchone()[0]
     location_country = conn.execute("SELECT value FROM settings WHERE key='fake_country'").fetchone()[0]
     dns_status = conn.execute("SELECT value FROM settings WHERE key='fake_dns'").fetchone()[0]
-    obfuscator_status = conn.execute("SELECT value FROM settings WHERE key='obfuscator'").fetchone()[0]
-    obfuscator_profile = conn.execute("SELECT value FROM settings WHERE key='obfuscator_profile'").fetchone()[0]
+    half_price_status = conn.execute("SELECT value FROM settings WHERE key='half_price'").fetchone()[0]
     conn.close()
     
     msg = (
@@ -1719,8 +1701,8 @@ async def show_status(query):
         f"👥 Users: `{active}`\n\n"
         f"🇺🇸 Location: `{location_status} ({location_country})`\n"
         f"📡 DNS: `{dns_status}`\n"
-        f"🛡️ Obfuscator: `{obfuscator_status} ({obfuscator_profile})`\n"
-        f"⚡ Mode: `GOD MODE`\n"
+        f"🇮🇷 Half-Price: `{half_price_status}`\n"
+        f"⚡ Mode: `HAKIM`\n"
     )
     
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
@@ -1778,18 +1760,17 @@ show_banner() {
     LOCATION_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_location';")
     LOCATION_COUNTRY=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_country';")
     DNS_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_dns';")
-    OBFUSCATOR_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='obfuscator';")
-    OBFUSCATOR_PROFILE=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='obfuscator_profile';")
+    HALF_PRICE_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='half_price';")
     
     echo ""
     echo -e "${PURPLE}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║     ${GREEN}🔱 SHADOW SSH v22.0 - GOD MODE 🔱${PURPLE}                   ║${NC}"
+    echo -e "${PURPLE}║     ${GREEN}🔱 SHADOW SSH v25.0 - HAKIM EDITION 🔱${PURPLE}               ║${NC}"
     echo -e "${PURPLE}╠══════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${PURPLE}║${NC}  🌐 ${SERVER_IP}:22  |  ⚡ GOD MODE  |  🤖 AI Active"
+    echo -e "${PURPLE}║${NC}  🌐 ${SERVER_IP}:22  |  ⚡ HAKIM  |  🤖 AI Active"
     
     [ "$LOCATION_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  🇺🇸 Fake Location: ${GREEN}ON (${LOCATION_COUNTRY})${NC}"
     [ "$DNS_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  📡 Fake DNS: ${CYAN}ON (1ms)${NC}"
-    [ "$OBFUSCATOR_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  🛡️ Obfuscator: ${GREEN}ON (${OBFUSCATOR_PROFILE})${NC}"
+    [ "$HALF_PRICE_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  🇮🇷 Half-Price: ${GREEN}ON (Auto-detect)${NC}"
     
     echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
@@ -1798,163 +1779,26 @@ show_banner() {
 show_menu() {
     clear
     show_banner
-    echo -e "${CYAN}══════════════ GOD MODE MENU ══════════════${NC}"
+    echo -e "${CYAN}══════════════ HAKIM MENU ══════════════${NC}"
     echo ""
     echo -e "  ${GREEN}1.${NC} ${WHITE}➕  Create New User${NC}"
     echo -e "  ${GREEN}2.${NC} ${WHITE}🗑   Delete User${NC}"
     echo -e "  ${GREEN}3.${NC} ${WHITE}👥  List All Users${NC}"
-    echo -e "  ${GREEN}4.${NC} ${WHITE}📱  Smart Config Generator${NC}"
+    echo -e "  ${GREEN}4.${NC} ${WHITE}📱  Config Generator (NapsternetV/V2Ray)${NC}"
     echo -e "  ${GREEN}5.${NC} ${WHITE}🇺🇸  Fake Location Control${NC}"
     echo -e "  ${GREEN}6.${NC} ${WHITE}📡  Fake DNS Control${NC}"
-    echo -e "  ${GREEN}7.${NC} ${WHITE}🛡️  Protocol Obfuscator${NC}"
+    echo -e "  ${GREEN}7.${NC} ${WHITE}🇮🇷  Half-Price Status${NC}"
     echo -e "  ${GREEN}8.${NC} ${WHITE}📦  Backup & Restore${NC}"
-    echo -e "  ${GREEN}9.${NC} ${WHITE}🤖  AI Config Checker${NC}"
-    echo -e "  ${GREEN}10.${NC} ${WHITE}🤖  Telegram Bot${NC}"
-    echo -e "  ${GREEN}11.${NC} ${WHITE}🌐  Domain Management${NC}"
-    echo -e "  ${GREEN}12.${NC} ${WHITE}📈  Server Status${NC}"
-    echo -e "  ${GREEN}13.${NC} ${WHITE}🚪  Exit${NC}"
+    echo -e "  ${GREEN}9.${NC} ${WHITE}🔍  PING-NET Debug${NC}"
+    echo -e "  ${GREEN}10.${NC} ${WHITE}🤖  AI Config Checker${NC}"
+    echo -e "  ${GREEN}11.${NC} ${WHITE}🤖  Telegram Bot${NC}"
+    echo -e "  ${GREEN}12.${NC} ${WHITE}🌐  Domain Management${NC}"
+    echo -e "  ${GREEN}13.${NC} ${WHITE}📈  Server Status${NC}"
+    echo -e "  ${GREEN}14.${NC} ${WHITE}🔄  Restart Services${NC}"
+    echo -e "  ${GREEN}15.${NC} ${WHITE}🚪  Exit${NC}"
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════${NC}"
     echo ""
-}
-
-fake_location_menu() {
-    while true; do
-        clear
-        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${YELLOW}   🇺🇸 FAKE LOCATION CONTROL${NC}"
-        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        /usr/local/bin/fake-location status
-        echo ""
-        echo -e "1. Enable Fake Location"
-        echo -e "2. Disable Fake Location"
-        echo -e "3. Change Country"
-        echo -e "4. List Countries"
-        echo -e "5. Back"
-        echo ""
-        echo -n -e "Select: "
-        read choice
-        
-        case $choice in
-            1)
-                echo ""
-                echo -e "Select: 1.USA 2.UK 3.Germany 4.Netherlands 5.Japan 6.Canada"
-                echo -n -e "Select [1-6]: "
-                read c
-                case $c in
-                    1) /usr/local/bin/fake-location start US ;;
-                    2) /usr/local/bin/fake-location start GB ;;
-                    3) /usr/local/bin/fake-location start DE ;;
-                    4) /usr/local/bin/fake-location start NL ;;
-                    5) /usr/local/bin/fake-location start JP ;;
-                    6) /usr/local/bin/fake-location start CA ;;
-                esac
-                sleep 2
-                ;;
-            2) /usr/local/bin/fake-location stop; sleep 2 ;;
-            3) /usr/local/bin/fake-location list; echo -n -e "Code: "; read code; /usr/local/bin/fake-location start "$code"; sleep 2 ;;
-            4) /usr/local/bin/fake-location list; echo ""; echo -n "Press Enter..."; read ;;
-            5) break ;;
-        esac
-    done
-}
-
-fake_dns_menu() {
-    while true; do
-        clear
-        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${CYAN}   📡 FAKE DNS CONTROL${NC}"
-        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        /usr/local/bin/fake-dns status
-        echo ""
-        echo -e "1. Enable Fake DNS (1ms)"
-        echo -e "2. Disable Fake DNS"
-        echo -e "3. Back"
-        echo ""
-        echo -n -e "Select: "
-        read choice
-        
-        case $choice in
-            1) /usr/local/bin/fake-dns start 1; sleep 2 ;;
-            2) /usr/local/bin/fake-dns stop; sleep 2 ;;
-            3) break ;;
-        esac
-    done
-}
-
-obfuscator_menu() {
-    while true; do
-        clear
-        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${GREEN}   🛡️ PROTOCOL OBFUSCATOR PRO${NC}"
-        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        /usr/local/bin/obfuscator status
-        echo ""
-        echo -e "1. Enable (YouTube profile)"
-        echo -e "2. Enable (Netflix profile)"
-        echo -e "3. Enable (Google profile)"
-        echo -e "4. Enable (Twitter profile)"
-        echo -e "5. Enable (WhatsApp profile)"
-        echo -e "6. Disable"
-        echo -e "7. Back"
-        echo ""
-        echo -n -e "Select: "
-        read choice
-        
-        case $choice in
-            1) /usr/local/bin/obfuscator start youtube; sleep 2 ;;
-            2) /usr/local/bin/obfuscator start netflix; sleep 2 ;;
-            3) /usr/local/bin/obfuscator start google; sleep 2 ;;
-            4) /usr/local/bin/obfuscator start twitter; sleep 2 ;;
-            5) /usr/local/bin/obfuscator start whatsapp; sleep 2 ;;
-            6) /usr/local/bin/obfuscator stop; sleep 2 ;;
-            7) break ;;
-        esac
-    done
-}
-
-backup_menu() {
-    while true; do
-        clear
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${BLUE}   📦 BACKUP & RESTORE${NC}"
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        /usr/local/bin/backup-manager list
-        echo ""
-        echo -e "1. Create New Backup"
-        echo -e "2. Restore from Backup"
-        echo -e "3. Send to Telegram"
-        echo -e "4. Toggle Auto-Backup (24h)"
-        echo -e "5. Back"
-        echo ""
-        echo -n -e "Select: "
-        read choice
-        
-        case $choice in
-            1) /usr/local/bin/backup-manager backup; sleep 2 ;;
-            2) /usr/local/bin/backup-manager restore; sleep 2 ;;
-            3) /usr/local/bin/backup-manager send; sleep 2 ;;
-            4)
-                if systemctl is-active --quiet shadow-backup; then
-                    systemctl stop shadow-backup
-                    echo -e "${YELLOW}Auto-backup disabled${NC}"
-                else
-                    systemctl start shadow-backup
-                    echo -e "${GREEN}Auto-backup enabled (every 24h)${NC}"
-                fi
-                sleep 2
-                ;;
-            5) break ;;
-        esac
-    done
 }
 
 create_user() {
@@ -2000,14 +1844,6 @@ EOF
     systemctl restart sshd 2>/dev/null
     
     SERVER=$(get_domain)
-    days_display="∞"
-    [ "$days" != "0" ] && days_display="$days"
-    traffic_display="∞"
-    [ "$traffic_gb" != "0" ] && traffic_display="$traffic_gb"
-    
-    config_json="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"📡 $username | ⏰ ${days_display}d | 📎 ${traffic_display}GB\",\"sshHost\":\"$SERVER\",\"sshPort\":22,\"sshUsername\":\"$username\",\"sshPassword\":\"$password\",\"udpgwTransparentDNS\":true}"
-    config_b64=$(echo -n "$config_json" | base64 -w 0)
-    npvt_link="npvt-ssh://${config_b64}"
     
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -2019,9 +1855,8 @@ EOF
     echo -e "  👤 Username: ${GREEN}${username}${NC}"
     echo -e "  🔑 Password: ${GREEN}${password}${NC}"
     echo -e "  📊 Limit: ${GREEN}${traffic_gb}GB${NC} | ⏰ ${GREEN}${days}d${NC} | 🔗 ${GREEN}${max_conn}${NC}"
-    echo ""
-    echo -e "${PURPLE}📋 NapsternetV:${NC}"
-    echo -e "${YELLOW}${npvt_link}${NC}"
+    echo -e "  🇮🇷 Iranian sites: HALF PRICE"
+    echo -e "  🌍 Foreign sites: FULL PRICE"
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
@@ -2063,16 +1898,18 @@ list_users() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     
-    printf "${WHITE}%-15s %-8s %-25s %-15s %-10s${NC}\n" "Username" "Status" "Used Traffic" "Limit" "Expiry"
+    printf "${WHITE}%-15s %-8s %-20s %-15s %-10s${NC}\n" "Username" "Status" "Used Traffic" "Limit" "Expiry"
     echo -e "${BLUE}────────────────────────────────────────────────────────────────────${NC}"
     
-    while IFS='|' read -r username status total_limit expiry limit; do
+    while IFS='|' read -r username status total_limit expiry limit iranian foreign; do
         [ -z "$username" ] && continue
         
         used=$(get_user_usage "$username")
-        sqlite3 "$DB" "UPDATE users SET used_traffic = $used WHERE username='$username';"
+        sqlite3 "$DB" "UPDATE users SET used_traffic = (iranian_traffic / 2) + foreign_traffic WHERE username='$username';"
         
         used_mb=$(echo "scale=2; $used / 1048576" | bc 2>/dev/null || echo "0")
+        iranian_mb=$(echo "scale=2; $iranian / 1048576" | bc 2>/dev/null || echo "0")
+        foreign_mb=$(echo "scale=2; $foreign / 1048576" | bc 2>/dev/null || echo "0")
         
         if [ "$total_limit" -eq 0 ]; then
             usage_text="${used_mb}MB / ∞"
@@ -2099,16 +1936,110 @@ list_users() {
             *) status_icon="⚪" ;;
         esac
         
-        printf "%-15s %s %-8s ${CYAN}%-25s${NC} ${YELLOW}%-15s${NC} ${GREEN}%-10s${NC}\n" \
+        printf "%-15s %s %-8s ${CYAN}%-20s${NC} ${YELLOW}%-15s${NC} ${GREEN}%-10s${NC}\n" \
             "$username" "$status_icon" "$status" "$usage_text" "$limit_text" "$expiry_text"
+        echo -e "         ${BLUE}🇮🇷 ${iranian_mb}MB (half) | 🌍 ${foreign_mb}MB (full)${NC}"
         
-    done < <(sqlite3 "$DB" "SELECT username, status, total_traffic, expiry, user_limit FROM users;")
+    done < <(sqlite3 "$DB" "SELECT username, status, total_traffic, expiry, user_limit, iranian_traffic, foreign_traffic FROM users;")
     
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     echo -n "Press Enter..."
     read
+}
+
+fake_location_menu() {
+    while true; do
+        clear
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}   🇺🇸 FAKE LOCATION CONTROL${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        
+        /usr/local/bin/fake-location status
+        echo ""
+        echo -e "1. Enable  2. Disable  3. Change Country  4. List  5. Back"
+        echo ""
+        echo -n -e "Select: "
+        read choice
+        
+        case $choice in
+            1)
+                echo -n -e "Country (US/GB/DE/NL/JP/CA): "
+                read c
+                /usr/local/bin/fake-location start "$c"
+                sleep 2
+                ;;
+            2) /usr/local/bin/fake-location stop; sleep 2 ;;
+            3) /usr/local/bin/fake-location list; echo -n -e "Code: "; read code; /usr/local/bin/fake-location start "$code"; sleep 2 ;;
+            4) /usr/local/bin/fake-location list; echo ""; echo -n "Press Enter..."; read ;;
+            5) break ;;
+        esac
+    done
+}
+
+fake_dns_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}   📡 FAKE DNS CONTROL${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        
+        /usr/local/bin/fake-dns status
+        echo ""
+        echo -e "1. Enable (1ms)  2. Disable  3. Back"
+        echo ""
+        echo -n -e "Select: "
+        read choice
+        
+        case $choice in
+            1) /usr/local/bin/fake-dns start 1; sleep 2 ;;
+            2) /usr/local/bin/fake-dns stop; sleep 2 ;;
+            3) break ;;
+        esac
+    done
+}
+
+half_price_status() {
+    clear
+    /usr/local/bin/half-price status
+    echo ""
+    echo -n "Press Enter..."
+    read
+}
+
+backup_menu() {
+    while true; do
+        clear
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${BLUE}   📦 BACKUP & RESTORE${NC}"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        
+        /usr/local/bin/backup-manager list
+        echo ""
+        echo -e "1. Create Backup  2. Restore  3. Send to Telegram  4. Auto-Backup  5. Back"
+        echo ""
+        echo -n -e "Select: "
+        read choice
+        
+        case $choice in
+            1) /usr/local/bin/backup-manager backup; sleep 2 ;;
+            2) /usr/local/bin/backup-manager restore; sleep 2 ;;
+            3) /usr/local/bin/backup-manager send; sleep 2 ;;
+            4)
+                if systemctl is-active --quiet shadow-backup; then
+                    systemctl stop shadow-backup
+                else
+                    systemctl start shadow-backup
+                fi
+                sleep 2
+                ;;
+            5) break ;;
+        esac
+    done
 }
 
 domain_management() {
@@ -2119,16 +2050,13 @@ domain_management() {
     echo ""
     
     if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-        echo -e "Current Domain: ${GREEN}$(cat $DOMAIN_FILE)${NC}"
+        echo -e "Current: ${GREEN}$(cat $DOMAIN_FILE)${NC}"
     else
-        echo -e "Current: ${YELLOW}No domain set${NC}"
+        echo -e "Current: ${YELLOW}No domain${NC}"
     fi
     
     echo ""
-    echo -e "1. Add/Change Domain"
-    echo -e "2. Get Free SSL"
-    echo -e "3. Delete Domain"
-    echo -e "4. Back"
+    echo -e "1. Add/Change  2. Get SSL  3. Delete  4. Back"
     echo ""
     echo -n -e "Select: "
     read choice
@@ -2154,7 +2082,7 @@ domain_management() {
             sleep 2
             ;;
         3)
-            echo -n -e "${RED}Delete domain? (y/n): ${NC}"
+            echo -n -e "${RED}Delete? (y/n): ${NC}"
             read confirm
             [ "$confirm" = "y" ] && rm -f "$DOMAIN_FILE" && echo -e "${GREEN}✅ Deleted${NC}"
             sleep 1
@@ -2185,8 +2113,9 @@ server_status() {
     echo -e "  🤖 AI: ${GREEN}$(systemctl is-active ai-optimizer 2>/dev/null || echo 'N/A')${NC}"
     echo -e "  🇺🇸 Location: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_location';")"
     echo -e "  📡 DNS: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_dns';")"
-    echo -e "  🛡️ Obfuscator: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='obfuscator';")"
+    echo -e "  🇮🇷 Half-Price: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='half_price';")"
     echo -e "  📦 Backup: $(systemctl is-active shadow-backup 2>/dev/null || echo 'N/A')"
+    echo -e "  🔍 Dedup: $(systemctl is-active dedup-monitor 2>/dev/null || echo 'N/A')"
     echo ""
     echo -n "Press Enter..."
     read
@@ -2195,22 +2124,65 @@ server_status() {
 # Main Loop
 while true; do
     show_menu
-    echo -n -e "${CYAN}Select [1-13]: ${NC}"
+    echo -n -e "${CYAN}Select [1-15]: ${NC}"
     read choice
     
     case $choice in
         1) create_user ;;
         2) delete_user ;;
         3) list_users ;;
-        4) /usr/local/bin/config-generator ;;
+        4)
+            echo ""
+            echo -e "${CYAN}Select protocol:${NC}"
+            echo -e "1. NapsternetV  2. V2Ray"
+            echo -n -e "Select: "
+            read pc
+            echo -n -e "Username: "
+            read uname
+            password=$(sqlite3 "$DB" "SELECT password FROM users WHERE username='$uname';")
+            expiry=$(sqlite3 "$DB" "SELECT expiry FROM users WHERE username='$uname';")
+            traffic=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$uname';")
+            
+            if [ -n "$password" ]; then
+                SERVER=$(get_domain)
+                days_left="∞"
+                [ "$expiry" != "0" ] && days_left=$(( (expiry - $(date +%s)) / 86400 ))
+                traffic_gb="∞"
+                [ "$traffic" != "0" ] && traffic_gb=$(echo "scale=0; $traffic / 1073741824" | bc)
+                
+                if [ "$pc" = "1" ]; then
+                    config_json="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"📡 $uname | ⏰ ${days_left}d | 📎 ${traffic_gb}GB\",\"sshHost\":\"$SERVER\",\"sshPort\":22,\"sshUsername\":\"$uname\",\"sshPassword\":\"$password\",\"udpgwTransparentDNS\":true}"
+                    config_b64=$(echo -n "$config_json" | base64 -w 0)
+                    echo -e "${YELLOW}npvt-ssh://${config_b64}${NC}"
+                else
+                    echo -e "${YELLOW}vless://370f9e58-f853-48e5-8fd5-5c182416aee4@${SERVER}:22?encryption=none&security=tls&sni=${SERVER}&fp=chrome&alpn=h2%2Chttp%2F1.1&type=xhttp&host=${SERVER}&path=/api&mode=auto#SSH-${uname}-${days_left}d${NC}"
+                fi
+            else
+                echo -e "${RED}❌ User not found!${NC}"
+            fi
+            echo ""
+            echo -n "Press Enter..."
+            read
+            ;;
         5) fake_location_menu ;;
         6) fake_dns_menu ;;
-        7) obfuscator_menu ;;
+        7) half_price_status ;;
         8) backup_menu ;;
-        9) /usr/local/bin/config-checker all ;;
-        10)
+        9)
+            echo -n -e "Username (or 'all'): "
+            read uname
+            if [ "$uname" = "all" ]; then
+                /usr/local/bin/ping-net all
+            else
+                /usr/local/bin/ping-net debug "$uname"
+            fi
+            echo ""
+            echo -n "Press Enter..."
+            read
+            ;;
+        10) /usr/local/bin/config-checker all ;;
+        11)
             if [ -f "$BOT_CONFIG" ]; then
-                echo ""
                 echo -e "1. Set Token  2. Add Admin  3. Start/Stop  4. Back"
                 echo -n -e "Select: "
                 read bc
@@ -2241,9 +2213,14 @@ while true; do
             fi
             sleep 1
             ;;
-        11) domain_management ;;
-        12) server_status ;;
-        13) echo -e "${GREEN}👋 Bye!${NC}"; exit 0 ;;
+        12) domain_management ;;
+        13) server_status ;;
+        14)
+            systemctl restart traffic-monitor shadow-bot sshd dedup-monitor ai-optimizer 2>/dev/null
+            echo -e "${GREEN}✅ Restarted!${NC}"
+            sleep 2
+            ;;
+        15) echo -e "${GREEN}👋 Bye!${NC}"; exit 0 ;;
     esac
 done
 MAINEOF
@@ -2313,29 +2290,59 @@ User=root
 WantedBy=multi-user.target
 BACKEOF
 
+cat > /etc/systemd/system/dedup-monitor.service << 'DEDUPEOF'
+[Unit]
+Description=Shadow SSH Dedup Monitor
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dedup-monitor
+Restart=always
+RestartSec=10
+User=root
+[Install]
+WantedBy=multi-user.target
+DEDUPEOF
+
+cat > /etc/systemd/system/half-price.service << 'HALFSRVEOF'
+[Unit]
+Description=Shadow SSH Half-Price Monitor
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/half-price monitor
+Restart=always
+RestartSec=10
+User=root
+[Install]
+WantedBy=multi-user.target
+HALFSRVEOF
+
 systemctl daemon-reload
-systemctl enable traffic-monitor shadow-bot ai-optimizer
-systemctl restart traffic-monitor ai-optimizer
+systemctl enable traffic-monitor shadow-bot ai-optimizer dedup-monitor half-price
+systemctl restart traffic-monitor ai-optimizer dedup-monitor half-price
 
 ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
 
+# Final Message
 clear
 echo ""
 echo -e "${PURPLE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║   ${GREEN}✅ SHADOW SSH v22.0 - GOD MODE INSTALLED!${PURPLE}            ║${NC}"
+echo -e "${PURPLE}║   ${GREEN}✅ SHADOW SSH v25.0 - HAKIM EDITION INSTALLED!${PURPLE}        ║${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${CYAN}🚀 ${YELLOW}shadow${CYAN} - Open Panel${NC}"
 echo ""
-echo -e "${GREEN}💣 GOD MODE FEATURES:${NC}"
-echo -e "  🛡️  Protocol Obfuscator (YouTube/Netflix/Google/Twitter/WhatsApp)"
-echo -e "  ⏰  Config Expiry Countdown (Live timer in config name)"
-echo -e "  📦  One-Click Backup & Restore (Telegram + Auto 24h)"
+echo -e "${GREEN}💣 HAKIM FEATURES:${NC}"
+echo -e "  🇮🇷  Smart Half-Price (Auto .ir + GeoIP detection)"
+echo -e "  🔍  ping-net Debug (Find traffic duplication)"
+echo -e "  🛡️  Dedup Monitor (Auto-remove duplicate PIDs)"
+echo -e "  ⚡  Rate Limiter Per User"
 echo -e "  🇺🇸  Fake Location (6 countries)"
 echo -e "  📡  Fake DNS (1ms response)"
 echo -e "  🤖  AI Optimizer + Config Checker"
-echo -e "  📱  Smart Config Generator (NapsternetV + V2Ray)"
-echo -e "  🌐  Domain Management (Add/Delete unified)"
+echo -e "  📦  Backup & Restore + Telegram"
+echo -e "  🌐  Domain Management (Add/Delete/SSL)"
 echo ""
 echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
