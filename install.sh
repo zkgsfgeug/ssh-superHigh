@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v11.0 - WITH REAL TRAFFIC MONITOR
+# Shadow SSH v12.0 - WITH DATABASE & ACCURATE TRACKING
 # =============================================
 
 RED='\033[0;31m'
@@ -17,89 +17,135 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # پاکسازی کامل
-rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /etc/shadow-* /etc/shadow-traffic /etc/systemd/system/traffic-monitor.service 2>/dev/null
+echo -e "${YELLOW}🧹 Cleaning previous installation...${NC}"
+rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /etc/shadow-* /etc/shadow-traffic /var/lib/shadow /etc/systemd/system/traffic-monitor.service 2>/dev/null
+systemctl stop traffic-monitor 2>/dev/null
+systemctl disable traffic-monitor 2>/dev/null
 pkill -9 shadow 2>/dev/null
 pkill -9 traffic-monitor 2>/dev/null
 
-for user in $(grep -oP '^[^:]+' /etc/shadow-users.conf 2>/dev/null); do
+for user in $(cut -d: -f1 /etc/shadow-users.conf 2>/dev/null); do
     userdel -r "$user" 2>/dev/null
 done
 
 # نصب پیش‌نیازها
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 apt update -qq
-apt install -y -qq curl wget coreutils openssh-server bc
+apt install -y -qq curl wget coreutils openssh-server sqlite3 bc
 
 # تنظیمات اولیه
 sed -i '/Port 8388/d' /etc/ssh/sshd_config 2>/dev/null
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 
-# ایجاد فایل‌ها
-> /etc/shadow-users.conf
-> /etc/shadow-domain.conf
-mkdir -p /etc/shadow-traffic
+# ایجاد دیتابیس و دایرکتوری‌ها
+mkdir -p /var/lib/shadow
+sqlite3 /var/lib/shadow/traffic.db << 'SQLEOF'
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password TEXT,
+    total_traffic INTEGER,
+    expiry INTEGER,
+    created INTEGER,
+    status TEXT DEFAULT 'active'
+);
+CREATE TABLE IF NOT EXISTS traffic_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    timestamp INTEGER,
+    rx_bytes INTEGER,
+    tx_bytes INTEGER,
+    total_mb INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_username ON traffic_log(username);
+CREATE INDEX IF NOT EXISTS idx_timestamp ON traffic_log(timestamp);
+SQLEOF
+
+chmod 755 /var/lib/shadow
+chmod 644 /var/lib/shadow/traffic.db
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v11.0 - REAL MONITOR${NC}"
+echo -e "${GREEN}   Shadow SSH v12.0 - DATABASE EDITION${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # =============================================
-# اسکریپت مانیتورینگ ترافیک (هر 10 ثانیه)
+# اسکریپت مانیتورینگ (IPTables-based)
 # =============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
 
-CONFIG_FILE="/etc/shadow-users.conf"
-TRAFFIC_DIR="/etc/shadow-traffic"
-LOG_FILE="/var/log/traffic-monitor.log"
+DB="/var/lib/shadow/traffic.db"
+INTERVAL=10
+
+# تابع گرفتن ترافیک از iptables
+get_iptables_traffic() {
+    local user=$1
+    local mark=$((1000 + $(echo "$user" | cksum | cut -d' ' -f1) % 9000))
+    
+    # ایجاد چین جداگانه برای هر کاربر
+    if ! iptables -L "USER_$user" -n 2>/dev/null | grep -q "Chain USER_$user"; then
+        iptables -N "USER_$user" 2>/dev/null
+        iptables -I OUTPUT -m owner --uid-owner "$user" -j "USER_$user" 2>/dev/null
+        iptables -I INPUT -m owner --uid-owner "$user" -j "USER_$user" 2>/dev/null
+    fi
+    
+    # صفر کردن قبلی
+    iptables -Z "USER_$user" 2>/dev/null
+    
+    # خواندن ترافیک
+    local rx=$(iptables -L "USER_$user" -v -n -x 2>/dev/null | grep -v "Chain" | awk '{sum+=$2} END {print sum}')
+    local tx=$(iptables -L "USER_$user" -v -n -x 2>/dev/null | grep -v "Chain" | awk '{sum+=$10} END {print sum}')
+    
+    echo "${rx:-0} ${tx:-0}"
+}
 
 while true; do
-    sleep 10
+    sleep $INTERVAL
     
-    while IFS=: read -r user pass max_traffic expiry _; do
+    sqlite3 "$DB" "SELECT username, total_traffic, status FROM users WHERE status='active'" 2>/dev/null | while IFS='|' read user total status; do
         [ -z "$user" ] && continue
         
-        traffic_file="${TRAFFIC_DIR}/${user}.txt"
-        [ ! -f "$traffic_file" ] && echo "0" > "$traffic_file"
+        # گرفتن ترافیک از روش‌های مختلف
+        rx_total=0
+        tx_total=0
         
-        # محاسبه ترافیک مصرفی از /proc
-        total_bytes=0
+        # روش 1: iptables
+        iptables_data=$(get_iptables_traffic "$user")
+        rx_iptables=$(echo "$iptables_data" | cut -d' ' -f1)
+        tx_iptables=$(echo "$iptables_data" | cut -d' ' -f2)
+        rx_total=$((rx_total + rx_iptables))
+        tx_total=$((tx_total + tx_iptables))
         
-        # پیدا کردن PID های کاربر
-        pids=$(pgrep -u "$user" 2>/dev/null)
-        
-        for pid in $pids; do
-            if [ -d "/proc/$pid" ]; then
-                # خواندن آمار شبکه از /proc
-                if [ -f "/proc/$pid/net/dev" ]; then
-                    rx=$(awk '/eth0|ens|wlan|venet|tun|tap/ {sum+=$2} END {print sum}' /proc/$pid/net/dev 2>/dev/null)
-                    tx=$(awk '/eth0|ens|wlan|venet|tun|tap/ {sum+=$10} END {print sum}' /proc/$pid/net/dev 2>/dev/null)
-                    [ -n "$rx" ] && [ -n "$tx" ] && total_bytes=$((total_bytes + rx + tx))
-                fi
+        # روش 2: /proc (برای fallback)
+        for pid in $(pgrep -u "$user" 2>/dev/null); do
+            if [ -f "/proc/$pid/net/dev" ]; then
+                rx_proc=$(awk '/eth0|ens|venet|tun|tap/ {sum+=$2} END {print sum}' /proc/$pid/net/dev 2>/dev/null)
+                tx_proc=$(awk '/eth0|ens|venet|tun|tap/ {sum+=$10} END {print sum}' /proc/$pid/net/dev 2>/dev/null)
+                rx_total=$((rx_total + ${rx_proc:-0}))
+                tx_total=$((tx_total + ${tx_proc:-0}))
             fi
         done
         
-        # تبدیل بایت به مگابایت
-        used_mb=$((total_bytes / 1024 / 1024))
+        # تبدیل به مگابایت
+        total_mb=$(((rx_total + tx_total) / 1024 / 1024))
         
-        # ذخیره ترافیک فعلی
-        echo "$used_mb" > "$traffic_file"
+        # ذخیره در دیتابیس
+        sqlite3 "$DB" "INSERT INTO traffic_log (username, timestamp, rx_bytes, tx_bytes, total_mb) 
+                       VALUES ('$user', $(date +%s), $rx_total, $tx_total, $total_mb)" 2>/dev/null
         
-        # بررسی محدودیت
-        if [ "$used_mb" -ge "$max_traffic" ]; then
-            # کاربر از محدودیت عبور کرده -> قطع کن
+        # بروزرسانی وضعیت کاربر
+        if [ "$total_mb" -ge "$total" ]; then
+            sqlite3 "$DB" "UPDATE users SET status='limited' WHERE username='$user'" 2>/dev/null
             pkill -u "$user" 2>/dev/null
             usermod -L "$user" 2>/dev/null
-            echo "$(date): User $user disabled (${used_mb}/${max_traffic} MB)" >> "$LOG_FILE"
+            echo "$(date): User $user disabled (${total_mb}/${total} MB)" >> /var/log/shadow-monitor.log
         fi
-        
-    done < "$CONFIG_FILE"
+    done
 done
 MONITOREOF
 
 chmod +x /usr/local/bin/traffic-monitor
 
-# سرویس مانیتورینگ
+# سرویس
 cat > /etc/systemd/system/traffic-monitor.service << 'SERVICEEOF'
 [Unit]
 Description=Traffic Monitor Service
@@ -117,17 +163,16 @@ SERVICEEOF
 
 systemctl daemon-reload
 systemctl enable traffic-monitor 2>/dev/null
-systemctl restart traffic-monitor 2>/dev/null
+systemctl start traffic-monitor 2>/dev/null
 
 # =============================================
-# اسکریپت اصلی پنل
+# پنل اصلی
 # =============================================
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
 
-CONFIG_FILE="/etc/shadow-users.conf"
+DB="/var/lib/shadow/traffic.db"
 DOMAIN_FILE="/etc/shadow-domain.conf"
-TRAFFIC_DIR="/etc/shadow-traffic"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -136,15 +181,8 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# ==================== توابع ====================
-
-is_valid_username() {
-    [[ "$1" =~ ^[a-z0-9]+$ ]]
-}
-
-is_number() {
-    [[ "$1" =~ ^[0-9]+$ ]]
-}
+is_valid_username() { [[ "$1" =~ ^[a-z0-9]+$ ]]; }
+is_number() { [[ "$1" =~ ^[0-9]+$ ]]; }
 
 get_server_ip() {
     local ip=$(curl -s -4 --max-time 2 ifconfig.me 2>/dev/null)
@@ -164,13 +202,14 @@ get_server() {
 
 get_traffic() {
     local user=$1
-    local file="${TRAFFIC_DIR}/${user}.txt"
-    if [ -f "$file" ]; then
-        local val=$(cat "$file" 2>/dev/null | tr -d '\n\r')
-        [[ "$val" =~ ^[0-9]+$ ]] && echo "$val" || echo "0"
-    else
-        echo "0"
-    fi
+    local total_mb=$(sqlite3 "$DB" "SELECT total_mb FROM traffic_log WHERE username='$user' ORDER BY timestamp DESC LIMIT 1" 2>/dev/null)
+    echo "${total_mb:-0}"
+}
+
+get_total_traffic() {
+    local user=$1
+    local total=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$user'" 2>/dev/null)
+    echo "${total:-0}"
 }
 
 make_config() {
@@ -178,7 +217,7 @@ make_config() {
     local pass=$2
     local server=$(get_server)
     local used=$(get_traffic "$user")
-    local total=$(grep "^$user:" "$CONFIG_FILE" | cut -d: -f3)
+    local total=$(get_total_traffic "$user")
     local remain=$((total - used))
     [ $remain -lt 0 ] && remain=0
     
@@ -195,15 +234,13 @@ make_config() {
 EOF
 }
 
-# ==================== منو ====================
-
 menu() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}        🚀 SHADOW SSH v11.0${NC}"
+    echo -e "${GREEN}        🚀 SHADOW SSH v12.0${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
-    echo -e "   ${GREEN}Monitor:${NC} $(systemctl is-active traffic-monitor 2>/dev/null)"
+    echo -e "   ${GREEN}DB Status:${NC} $(sqlite3 "$DB" "SELECT COUNT(*) FROM users" 2>/dev/null) users"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "   ${GREEN}✅${NC} ${YELLOW}1${NC}) Create User"
     echo -e "   ${BLUE}📋${NC} ${YELLOW}2${NC}) List Users"
@@ -212,7 +249,6 @@ menu() {
     echo -e "   ${RED}🗑️${NC} ${YELLOW}5${NC}) Delete User"
     echo -e "   ${CYAN}🌐${NC} ${YELLOW}6${NC}) Set Domain"
     echo -e "   ${YELLOW}🔙${NC} ${YELLOW}7${NC}) Remove Domain"
-    echo -e "   ${CYAN}🔄${NC} ${YELLOW}8${NC}) Manual Refresh"
     echo -e "   ${RED}❌${NC} ${YELLOW}0${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
@@ -233,6 +269,13 @@ create_user() {
         return
     fi
     
+    # چک تکراری
+    if sqlite3 "$DB" "SELECT username FROM users WHERE username='$username'" 2>/dev/null | grep -q "$username"; then
+        echo -e "\n${RED}❌ User already exists!${NC}"
+        sleep 2
+        return
+    fi
+    
     echo -n "🔑 Password: "
     read password
     [ -z "$password" ] && { echo -e "\n${RED}❌ Required!${NC}"; sleep 2; return; }
@@ -245,15 +288,18 @@ create_user() {
     read days
     ! is_number "$days" && { echo -e "\n${RED}❌ Must be number!${NC}"; sleep 2; return; }
 
-    grep -q "^$username:" "$CONFIG_FILE" 2>/dev/null && { echo -e "\n${RED}❌ Exists!${NC}"; sleep 2; return; }
-
     local expiry=$(date -d "+$days days" +%s)
+    local now=$(date +%s)
     
-    echo "$username:$password:$traffic:$expiry:0" >> "$CONFIG_FILE"
+    # ذخیره در دیتابیس
+    sqlite3 "$DB" "INSERT INTO users (username, password, total_traffic, expiry, created, status) 
+                   VALUES ('$username', '$password', $traffic, $expiry, $now, 'active')" 2>/dev/null
+    
+    # ایجاد کاربر سیستمی
     useradd -M -s /bin/false "$username" 2>/dev/null
     echo "$username:$password" | chpasswd 2>/dev/null
-    echo "0" > "${TRAFFIC_DIR}/${username}.txt"
     
+    # ساخت کانفیگ
     local config=$(make_config "$username" "$password")
     local b64=$(echo -n "$config" | base64 -w 0)
     local npvt="npvt-ssh://${b64}"
@@ -275,9 +321,7 @@ create_user() {
     echo -e "   Traffic: $traffic MB"
     echo -e "   Expiry: $days days"
     echo -e ""
-    echo -e "${YELLOW}⚠️  Traffic is monitored every 10 seconds!${NC}"
-    echo -e "${YELLOW}   User will be auto-disconnected when limit reached.${NC}"
-    echo -e "\n${YELLOW}Press Enter...${NC}"
+    echo -e "${YELLOW}Press Enter...${NC}"
     read dummy
 }
 
@@ -287,26 +331,26 @@ list_users() {
     echo -e "${GREEN}📋 USERS LIST${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
-    if [ ! -s "$CONFIG_FILE" ]; then
+    local count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM users" 2>/dev/null)
+    if [ "$count" -eq 0 ]; then
         echo -e "${RED}❌ No users${NC}"
     else
         printf "   %-15s %-10s %-10s %-10s %-10s\n" "USER" "TOTAL" "USED" "REMAIN" "STATUS"
         echo -e "${BLUE}──────────────────────────────────────────────────${NC}"
         
-        while IFS=: read -r user pass total expiry _; do
-            local used=$(get_traffic "$user")
+        sqlite3 "$DB" "SELECT username, total_traffic, expiry, status FROM users" 2>/dev/null | while IFS='|' read user total expiry status; do
+            local used=$(sqlite3 "$DB" "SELECT total_mb FROM traffic_log WHERE username='$user' ORDER BY timestamp DESC LIMIT 1" 2>/dev/null)
+            [ -z "$used" ] && used=0
             local remain=$((total - used))
             [ $remain -lt 0 ] && remain=0
             local days_left=$(( (expiry - $(date +%s)) / 86400 ))
             
-            if [ $days_left -lt 0 ]; then
-                printf "   ${RED}%-15s %-10s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB" "EXPIRED"
-            elif [ $remain -eq 0 ]; then
-                printf "   ${RED}%-15s %-10s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB" "LIMIT"
+            if [ "$status" = "limited" ] || [ $days_left -lt 0 ] || [ $remain -eq 0 ]; then
+                printf "   ${RED}%-15s %-10s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB" "DISABLED"
             else
                 printf "   ${GREEN}✅${NC} ${GREEN}%-13s${NC} ${YELLOW}%-10s${NC} %-10s ${CYAN}%-10s${NC} ${GREEN}ACTIVE${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB"
             fi
-        done < "$CONFIG_FILE"
+        done
     fi
     
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
@@ -323,13 +367,13 @@ show_config() {
     echo -n "👤 Username: "
     read username
     
-    if ! grep -q "^$username:" "$CONFIG_FILE" 2>/dev/null; then
+    local pass=$(sqlite3 "$DB" "SELECT password FROM users WHERE username='$username'" 2>/dev/null)
+    if [ -z "$pass" ]; then
         echo -e "\n${RED}❌ Not found!${NC}"
         sleep 2
         return
     fi
     
-    local pass=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
     local config=$(make_config "$username" "$pass")
     local b64=$(echo -n "$config" | base64 -w 0)
     local npvt="npvt-ssh://${b64}"
@@ -353,16 +397,18 @@ user_stats() {
     echo -n "👤 Username: "
     read username
     
-    local line=$(grep "^$username:" "$CONFIG_FILE" 2>/dev/null)
-    if [ -z "$line" ]; then
+    local user_data=$(sqlite3 "$DB" "SELECT total_traffic, expiry, status FROM users WHERE username='$username'" 2>/dev/null)
+    if [ -z "$user_data" ]; then
         echo -e "\n${RED}❌ Not found!${NC}"
         sleep 2
         return
     fi
     
-    local total=$(echo "$line" | cut -d: -f3)
-    local expiry_ts=$(echo "$line" | cut -d: -f4)
-    local used=$(get_traffic "$username")
+    local total=$(echo "$user_data" | cut -d'|' -f1)
+    local expiry_ts=$(echo "$user_data" | cut -d'|' -f2)
+    local status=$(echo "$user_data" | cut -d'|' -f3)
+    local used=$(sqlite3 "$DB" "SELECT total_mb FROM traffic_log WHERE username='$username' ORDER BY timestamp DESC LIMIT 1" 2>/dev/null)
+    [ -z "$used" ] && used=0
     local remain=$((total - used))
     [ $remain -lt 0 ] && remain=0
     local days_left=$(( (expiry_ts - $(date +%s)) / 86400 ))
@@ -377,6 +423,7 @@ user_stats() {
     echo -e "   Used:    ${RED}${used} MB${NC}"
     echo -e "   Remain:  ${GREEN}${remain} MB${NC}"
     echo -e "   Days:    ${days_left} days left${NC}"
+    echo -e "   Status:  $([ "$status" = "active" ] && echo "${GREEN}ACTIVE${NC}" || echo "${RED}DISABLED${NC}")"
     
     local bar_len=30
     local filled=$((percent * bar_len / 100))
@@ -384,12 +431,6 @@ user_stats() {
     printf "%${filled}s" | tr ' ' '█'
     printf "%$((bar_len - filled))s" | tr ' ' '░'
     echo "] ${percent}%"
-    
-    if [ $remain -lt 50 ] && [ $remain -gt 0 ]; then
-        echo -e "\n${YELLOW}⚠️  Low traffic: ${remain} MB left${NC}"
-    elif [ $remain -eq 0 ]; then
-        echo -e "\n${RED}❌ LIMIT REACHED! User will be disconnected.${NC}"
-    fi
     
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "\n${YELLOW}Press Enter...${NC}"
@@ -411,8 +452,8 @@ delete_user() {
     
     pkill -u "$username" 2>/dev/null
     userdel -r "$username" 2>/dev/null
-    sed -i "/^$username:/d" "$CONFIG_FILE"
-    rm -f "${TRAFFIC_DIR}/${username}.txt"
+    sqlite3 "$DB" "DELETE FROM users WHERE username='$username'" 2>/dev/null
+    sqlite3 "$DB" "DELETE FROM traffic_log WHERE username='$username'" 2>/dev/null
     
     echo -e "\n${GREEN}✅ Deleted!${NC}"
     sleep 2
@@ -439,22 +480,9 @@ remove_domain() {
     sleep 2
 }
 
-manual_refresh() {
-    clear
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}🔄 MANUAL REFRESH${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    
-    systemctl restart traffic-monitor
-    echo -e "${GREEN}✅ Monitor restarted!${NC}"
-    sleep 2
-}
-
-# ==================== اجرا ====================
-
 while true; do
     menu
-    echo -n "👉 Choose [0-8]: "
+    echo -n "👉 Choose [0-7]: "
     read choice
     case $choice in
         1) create_user ;;
@@ -464,7 +492,6 @@ while true; do
         5) delete_user ;;
         6) set_domain ;;
         7) remove_domain ;;
-        8) manual_refresh ;;
         0) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
         *) echo -e "${RED}❌ Invalid${NC}"; sleep 1 ;;
     esac
@@ -475,14 +502,14 @@ chmod +x /usr/local/bin/shadow
 
 clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✅ INSTALLATION COMPLETE! v11.0${NC}"
+echo -e "${GREEN}✅ INSTALLATION COMPLETE! v12.0${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 echo -e ""
-echo -e "${YELLOW}✨ HOW IT WORKS:${NC}"
-echo -e "   ${GREEN}✅${NC} Traffic monitored every 10 seconds"
-echo -e "   ${GREEN}✅${NC} User disconnected when limit reached"
-echo -e "   ${GREEN}✅${NC} Real-time traffic display"
-echo -e "   ${GREEN}✅${NC} No manual traffic update needed"
+echo -e "${YELLOW}✨ FEATURES:${NC}"
+echo -e "   ${GREEN}✅${NC} SQLite3 Database for accurate tracking"
+echo -e "   ${GREEN}✅${NC} IPTables + /proc dual monitoring"
+echo -e "   ${GREEN}✅${NC} Real-time traffic updates"
+echo -e "   ${GREEN}✅${NC} Auto-disable when limit reached"
 echo -e ""
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
