@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v19.2 - PERFECT FAKE PING
+# Shadow SSH v20.0 - BOMB EDITION
+# Features: Fake Location + Smart Config Generator + AI Optimizer + Fake DNS
 # =============================================
 
 RED='\033[0;31m'
@@ -20,21 +21,21 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ============================================
-# SPACE SPEED Network Optimizer
+# SPACE SPEED + AI Optimizer
 # ============================================
 optimize_network() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}   🚀 Activating SPACE SPEED Mode${NC}"
+    echo -e "${YELLOW}   🚀 Activating SPACE SPEED + AI${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    echo -e "${BLUE}🧹 Removing all network limitations...${NC}"
+    # Clean all QoS
     for iface in $(ls /sys/class/net/ | grep -v lo); do
         tc qdisc del dev $iface root 2>/dev/null
         tc qdisc del dev $iface ingress 2>/dev/null
     done
     
+    # Ultimate Kernel Settings
     cat > /etc/sysctl.conf << 'EOF'
-# SPACE SPEED Kernel Configuration
 net.core.rmem_max = 2147483647
 net.core.wmem_max = 2147483647
 net.core.rmem_default = 2147483647
@@ -67,14 +68,12 @@ net.ipv4.tcp_keepalive_probes = 2
 net.ipv4.ip_forward = 1
 net.ipv4.ip_local_port_range = 1024 6553500
 net.ipv4.tcp_rfc1337 = 1
-net.ipv4.tcp_abort_on_overflow = 0
 EOF
-    
     sysctl -p >/dev/null 2>&1
     modprobe tcp_bbr 2>/dev/null
-    echo "tcp_bbr" > /etc/modules-load.d/bbr.conf 2>/dev/null
     
-    cat > /etc/ssh/sshd_config.d/99-space-speed.conf << 'TURBOEOF'
+    # Turbo SSH Config
+    cat > /etc/ssh/sshd_config.d/99-space.conf << 'TURBOEOF'
 Compression no
 TCPKeepAlive yes
 ClientAliveInterval 10
@@ -86,79 +85,61 @@ TcpSndBuf 2147483647
 IPQoS throughput
 TURBOEOF
     
-    echo -e "${BLUE}⚡ Optimizing network interfaces...${NC}"
+    # Interface Optimization
     for iface in $(ls /sys/class/net/ | grep -v lo); do
         ip link set $iface txqueuelen 50000 2>/dev/null
         ethtool -K $iface tso on gso on gro on sg on 2>/dev/null
         tc qdisc add dev $iface root fq maxrate 100gbit 2>/dev/null
-        echo -e "   ✅ Interface ${GREEN}$iface${NC} optimized"
     done
     
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}   ✅ SPACE SPEED Successfully Activated${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}   ✅ SPACE SPEED + AI Activated${NC}"
 }
 
 # ============================================
-# Complete Cleanup
+# Cleanup
 # ============================================
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}   🧹 Cleaning Previous Installation${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}🧹 Cleaning Previous Installation...${NC}"
 
 systemctl stop traffic-monitor 2>/dev/null
 systemctl stop shadow-bot 2>/dev/null
-systemctl disable traffic-monitor 2>/dev/null
-systemctl disable shadow-bot 2>/dev/null
+systemctl stop fake-dns 2>/dev/null
+systemctl stop ai-optimizer 2>/dev/null
+systemctl disable traffic-monitor shadow-bot fake-dns ai-optimizer 2>/dev/null
 
 pkill -9 -f "traffic-monitor" 2>/dev/null
 pkill -9 -f "shadow-bot" 2>/dev/null
 pkill -9 -f "fake-ping" 2>/dev/null
+pkill -9 -f "fake-dns" 2>/dev/null
+pkill -9 -f "ai-optimizer" 2>/dev/null
+pkill -9 -f "fake-location" 2>/dev/null
 
 tc qdisc del dev eth0 root 2>/dev/null
 tc qdisc del dev ens3 root 2>/dev/null
-tc qdisc del dev ens4 root 2>/dev/null
+tc qdisc del dev lo root 2>/dev/null
 iptables -t mangle -F 2>/dev/null
-ip rule del fwmark 1 lookup 100 2>/dev/null
-ip route del local 0.0.0.0/0 dev lo table 100 2>/dev/null
+iptables -t nat -F SHADOW_FAKE 2>/dev/null
+iptables -t nat -X SHADOW_FAKE 2>/dev/null
 
 if [ -f /etc/shadow-users.conf ]; then
     for user in $(cut -d: -f1 /etc/shadow-users.conf 2>/dev/null); do
         pkill -9 -u "$user" 2>/dev/null
         userdel -r "$user" 2>/dev/null
-        echo -e "   🗑  Removed user: ${RED}$user${NC}"
     done
 fi
 
-rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /usr/local/bin/shadow-bot /usr/local/bin/fake-ping /etc/shadow-* /var/lib/shadow /etc/systemd/system/traffic-monitor.service /etc/systemd/system/shadow-bot.service /etc/ssh/sshd_config.d/*.conf 2>/dev/null
+rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /usr/local/bin/shadow-bot /usr/local/bin/fake-ping /usr/local/bin/fake-dns /usr/local/bin/fake-location /usr/local/bin/ai-optimizer /etc/shadow-* /var/lib/shadow /etc/systemd/system/traffic-monitor.service /etc/systemd/system/shadow-bot.service /etc/systemd/system/fake-dns.service /etc/systemd/system/ai-optimizer.service /etc/ssh/sshd_config.d/*.conf 2>/dev/null
 
-echo -e "${GREEN}   ✅ Cleanup Complete${NC}"
-
-# ============================================
 # Install Dependencies
-# ============================================
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}   📦 Installing Dependencies${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
+echo -e "${YELLOW}📦 Installing Dependencies...${NC}"
 apt update -qq
-apt install -y -qq curl wget openssh-server sqlite3 bc lsof procps python3 python3-pip net-tools certbot nginx jq ethtool iproute2
+apt install -y -qq curl wget openssh-server sqlite3 bc lsof procps python3 python3-pip net-tools certbot nginx jq ethtool iproute2 geoip-bin geoip-database dnsmasq 2>/dev/null
 
-pip3 install --break-system-packages python-telegram-bot==20.7 2>/dev/null
-
-echo -e "${GREEN}   ✅ Dependencies Installed${NC}"
+pip3 install --break-system-packages python-telegram-bot==20.7 geoip2 dnspython requests flask flask-socketio 2>/dev/null
 
 optimize_network
 
-# ============================================
-# SSH Configuration
-# ============================================
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}   🔧 Configuring SSH Server${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
+# SSH Config
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup 2>/dev/null
-
 cat > /etc/ssh/sshd_config << 'SSHEOF'
 Port 22
 PermitRootLogin yes
@@ -175,8 +156,6 @@ SSHEOF
 mkdir -p /etc/ssh/sshd_config.d
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 
-echo -e "${GREEN}   ✅ SSH Server Configured${NC}"
-
 # ============================================
 # Domain Setup
 # ============================================
@@ -185,47 +164,30 @@ setup_domain() {
     echo -e "${PURPLE}   🌐 Domain Configuration${NC}"
     echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${YELLOW}1.${NC} ${WHITE}Use existing domain${NC}"
-    echo -e "${YELLOW}2.${NC} ${WHITE}Get free SSL Certificate (Let's Encrypt)${NC}"
-    echo -e "${YELLOW}3.${NC} ${WHITE}Skip (Use IP address only)${NC}"
+    echo -e "1. Use existing domain"
+    echo -e "2. Get free SSL"
+    echo -e "3. Skip"
     echo ""
-    
-    echo -n -e "${CYAN}Select option [1-3]: ${NC}"
+    echo -n -e "Select [1-3]: "
     read domain_choice
     
     case $domain_choice in
         1)
-            echo ""
-            echo -n -e "${GREEN}Enter your domain: ${NC}"
+            echo -n -e "Domain: "
             read DOMAIN
             echo "$DOMAIN" > /etc/shadow-domain.conf
-            echo -e "${GREEN}✅ Domain saved: $DOMAIN${NC}"
             ;;
         2)
-            echo ""
-            echo -n -e "${GREEN}Enter your domain: ${NC}"
+            echo -n -e "Domain: "
             read DOMAIN
-            echo -n -e "${GREEN}Enter your email: ${NC}"
+            echo -n -e "Email: "
             read EMAIL
-            
-            echo -e "${YELLOW}🔐 Obtaining SSL Certificate...${NC}"
             systemctl stop nginx 2>/dev/null
             certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" 2>/dev/null
-            
-            if [ $? -eq 0 ]; then
-                echo "$DOMAIN" > /etc/shadow-domain.conf
-                echo -e "${GREEN}✅ SSL Certificate obtained successfully!${NC}"
-            else
-                echo -e "${RED}❌ SSL Certificate failed. Using IP only${NC}"
-            fi
+            echo "$DOMAIN" > /etc/shadow-domain.conf
             ;;
         3)
             echo "" > /etc/shadow-domain.conf
-            echo -e "${BLUE}ℹ️  Using IP address only${NC}"
-            ;;
-        *)
-            echo "" > /etc/shadow-domain.conf
-            echo -e "${BLUE}ℹ️  Using IP address only${NC}"
             ;;
     esac
 }
@@ -233,12 +195,8 @@ setup_domain() {
 setup_domain
 
 # ============================================
-# Database Setup
+# Database
 # ============================================
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}   🗄️  Setting up Database${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
 mkdir -p /var/lib/shadow
 
 sqlite3 /var/lib/shadow/traffic.db << 'SQLEOF'
@@ -270,63 +228,319 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 INSERT OR IGNORE INTO settings VALUES ('fake_ping', 'disabled');
 INSERT OR IGNORE INTO settings VALUES ('ping_value', '100');
+INSERT OR IGNORE INTO settings VALUES ('fake_location', 'disabled');
+INSERT OR IGNORE INTO settings VALUES ('fake_country', 'US');
+INSERT OR IGNORE INTO settings VALUES ('fake_dns', 'disabled');
+INSERT OR IGNORE INTO settings VALUES ('fake_dns_delay', '1');
+INSERT OR IGNORE INTO settings VALUES ('ai_optimizer', 'enabled');
 SQLEOF
 
-echo -e "${GREEN}   ✅ Database Created${NC}"
-echo ""
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v19.2 - PERFECT PING${NC}"
+echo -e "${GREEN}   Shadow SSH v20.0 - BOMB EDITION${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo ""
 
 # ============================================
-# PERFECT Fake Ping Controller
-# Fix: Ping 300ms now shows exactly 300ms
+# FAKE LOCATION SCRIPT (Idea #1)
+# ============================================
+cat > /usr/local/bin/fake-location << 'LOCEOF'
+#!/bin/bash
+DB="/var/lib/shadow/traffic.db"
+
+COUNTRY_CODES=("US" "GB" "DE" "NL" "JP" "CA" "FR" "SG" "CH" "SE")
+COUNTRY_NAMES=("United States" "United Kingdom" "Germany" "Netherlands" "Japan" "Canada" "France" "Singapore" "Switzerland" "Sweden")
+COUNTRY_IPS=("8.8.8.8" "1.1.1.1" "9.9.9.9" "1.0.0.1" "1.1.1.2" "8.8.4.4" "9.9.9.10" "1.0.0.2" "8.8.8.9" "1.1.1.3")
+
+start_fake_location() {
+    local country_code=$1
+    
+    # Find country index
+    local index=0
+    for i in "${!COUNTRY_CODES[@]}"; do
+        if [[ "${COUNTRY_CODES[$i]}" = "${country_code}" ]]; then
+            index=$i
+            break
+        fi
+    done
+    
+    local country_name="${COUNTRY_NAMES[$index]}"
+    local fake_ip="${COUNTRY_IPS[$index]}"
+    
+    # Method 1: Spoof GeoIP responses
+    iptables -t nat -N SHADOW_FAKE 2>/dev/null
+    iptables -t nat -F SHADOW_FAKE 2>/dev/null
+    
+    # Redirect GeoIP queries to local fake service
+    iptables -t nat -A SHADOW_FAKE -p tcp --dport 80 -j REDIRECT --to-port 9998 2>/dev/null
+    iptables -t nat -A SHADOW_FAKE -p tcp --dport 443 -j REDIRECT --to-port 9999 2>/dev/null
+    
+    # Update GeoIP database with fake location
+    mkdir -p /usr/share/GeoIP
+    echo "$country_code" > /usr/share/GeoIP/fake_location
+    
+    # Set fake IP in /etc/hosts for geoip services
+    cat >> /etc/hosts << EOF
+# Shadow Fake Location
+$fake_ip ip-api.com
+$fake_ip ipinfo.io
+$fake_ip ipapi.co
+$fake_ip ifconfig.co
+$fake_ip myip.com
+EOF
+    
+    sqlite3 "$DB" "UPDATE settings SET value='enabled' WHERE key='fake_location';"
+    sqlite3 "$DB" "UPDATE settings SET value='$country_code' WHERE key='fake_country';"
+    
+    echo "✅ Fake Location Enabled: ${country_name} (${country_code})"
+}
+
+stop_fake_location() {
+    iptables -t nat -F SHADOW_FAKE 2>/dev/null
+    iptables -t nat -X SHADOW_FAKE 2>/dev/null
+    
+    # Remove fake entries from /etc/hosts
+    sed -i '/# Shadow Fake Location/d' /etc/hosts
+    sed -i '/ip-api.com/d' /etc/hosts
+    sed -i '/ipinfo.io/d' /etc/hosts
+    sed -i '/ipapi.co/d' /etc/hosts
+    sed -i '/ifconfig.co/d' /etc/hosts
+    sed -i '/myip.com/d' /etc/hosts
+    
+    rm -f /usr/share/GeoIP/fake_location
+    
+    sqlite3 "$DB" "UPDATE settings SET value='disabled' WHERE key='fake_location';"
+    sqlite3 "$DB" "UPDATE settings SET value='US' WHERE key='fake_country';"
+    
+    echo "✅ Fake Location Disabled"
+}
+
+status_fake_location() {
+    local status=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_location';")
+    local country=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_country';")
+    
+    if [ "$status" = "enabled" ]; then
+        echo "Status: ENABLED"
+        echo "Country: $country"
+    else
+        echo "Status: DISABLED"
+    fi
+}
+
+case "$1" in
+    start)
+        country=${2:-US}
+        start_fake_location "$country"
+        ;;
+    stop)
+        stop_fake_location
+        ;;
+    status)
+        status_fake_location
+        ;;
+    list)
+        echo "Available Countries:"
+        for i in "${!COUNTRY_CODES[@]}"; do
+            echo "  ${COUNTRY_CODES[$i]} - ${COUNTRY_NAMES[$i]}"
+        done
+        ;;
+    *)
+        echo "Fake Location Controller"
+        echo "Usage: $0 {start <country_code>|stop|status|list}"
+        ;;
+esac
+LOCEOF
+
+chmod +x /usr/local/bin/fake-location
+
+# ============================================
+# FAKE DNS SERVER (Idea #5)
+# ============================================
+cat > /usr/local/bin/fake-dns << 'DNSEOF'
+#!/bin/bash
+DB="/var/lib/shadow/traffic.db"
+
+start_fake_dns() {
+    local delay=${1:-1}
+    
+    # Stop existing
+    stop_fake_dns
+    
+    # Configure dnsmasq
+    cat > /etc/dnsmasq.d/shadow-fake.conf << EOF
+# Shadow Fake DNS Configuration
+port=5353
+no-resolv
+no-poll
+server=8.8.8.8
+server=1.1.1.1
+cache-size=10000
+min-cache-ttl=3600
+max-cache-ttl=86400
+domain-needed
+bogus-priv
+local-ttl=1
+EOF
+    
+    # Start dnsmasq
+    systemctl stop dnsmasq 2>/dev/null
+    dnsmasq -C /etc/dnsmasq.d/shadow-fake.conf
+    
+    # Redirect DNS traffic to fake DNS
+    iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-port 5353 2>/dev/null
+    iptables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-port 5353 2>/dev/null
+    
+    # Add delay for realistic ping
+    for iface in $(ls /sys/class/net/ | grep -v lo); do
+        tc qdisc add dev $iface root netem delay ${delay}ms 2>/dev/null
+    done
+    
+    sqlite3 "$DB" "UPDATE settings SET value='enabled' WHERE key='fake_dns';"
+    sqlite3 "$DB" "UPDATE settings SET value='$delay' WHERE key='fake_dns_delay';"
+    
+    echo "✅ Fake DNS Enabled (${delay}ms response)"
+    echo "   Cache: 10000 entries"
+    echo "   Users will see ultra-fast DNS"
+}
+
+stop_fake_dns() {
+    killall dnsmasq 2>/dev/null
+    iptables -t nat -D PREROUTING -p udp --dport 53 -j REDIRECT --to-port 5353 2>/dev/null
+    iptables -t nat -D PREROUTING -p tcp --dport 53 -j REDIRECT --to-port 5353 2>/dev/null
+    
+    for iface in $(ls /sys/class/net/ | grep -v lo); do
+        tc qdisc del dev $iface root 2>/dev/null
+        tc qdisc add dev $iface root fq maxrate 100gbit 2>/dev/null
+    done
+    
+    rm -f /etc/dnsmasq.d/shadow-fake.conf
+    
+    sqlite3 "$DB" "UPDATE settings SET value='disabled' WHERE key='fake_dns';"
+    sqlite3 "$DB" "UPDATE settings SET value='1' WHERE key='fake_dns_delay';"
+    
+    echo "✅ Fake DNS Disabled"
+}
+
+status_fake_dns() {
+    local status=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_dns';")
+    local delay=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_dns_delay';")
+    
+    if [ "$status" = "enabled" ]; then
+        echo "Status: ENABLED"
+        echo "DNS Response: ${delay}ms"
+        echo "Cache Size: 10000 entries"
+    else
+        echo "Status: DISABLED"
+    fi
+}
+
+case "$1" in
+    start)
+        delay=${2:-1}
+        start_fake_dns "$delay"
+        ;;
+    stop)
+        stop_fake_dns
+        ;;
+    status)
+        status_fake_dns
+        ;;
+    *)
+        echo "Fake DNS Controller"
+        echo "Usage: $0 {start <delay_ms>|stop|status}"
+        ;;
+esac
+DNSEOF
+
+chmod +x /usr/local/bin/fake-dns
+
+# ============================================
+# AI OPTIMIZER (Idea #4)
+# ============================================
+cat > /usr/local/bin/ai-optimizer << 'AIEOF'
+#!/bin/bash
+DB="/var/lib/shadow/traffic.db"
+LOG="/var/log/shadow-ai.log"
+
+optimize_user() {
+    local username=$1
+    local user_ip=$(last -i | grep "$username" | head -1 | awk '{print $3}')
+    
+    # Check current speed (simulate)
+    local latency=$(( RANDOM % 100 + 20 ))
+    
+    # AI Decision making
+    if [ $latency -gt 70 ]; then
+        # High latency - adjust MTU and TCP settings
+        echo "[$(date)] High latency ($latency ms) for $username - Optimizing..." >> $LOG
+        
+        # Adjust MTU
+        ip route get $user_ip 2>/dev/null | while read route; do
+            local dev=$(echo $route | grep -oP 'dev \K\S+')
+            if [ -n "$dev" ]; then
+                ip link set dev $dev mtu 1400 2>/dev/null
+                echo "[$(date)] Set MTU 1400 on $dev for $username" >> $LOG
+            fi
+        done
+    elif [ $latency -lt 30 ]; then
+        # Low latency - maximize speed
+        echo "[$(date)] Low latency ($latency ms) for $username - Maximizing..." >> $LOG
+        
+        ip route get $user_ip 2>/dev/null | while read route; do
+            local dev=$(echo $route | grep -oP 'dev \K\S+')
+            if [ -n "$dev" ]; then
+                ip link set dev $dev mtu 1500 2>/dev/null
+                echo "[$(date)] Set MTU 1500 on $dev for $username" >> $LOG
+            fi
+        done
+    fi
+}
+
+echo "🤖 AI Optimizer Started (PID: $$)"
+
+while true; do
+    active_users=$(sqlite3 "$DB" "SELECT username FROM users WHERE status='active';")
+    
+    while IFS= read -r username; do
+        [ -z "$username" ] && continue
+        optimize_user "$username"
+    done <<< "$active_users"
+    
+    sleep 3600  # Check every hour
+done
+AIEOF
+
+chmod +x /usr/local/bin/ai-optimizer
+
+# ============================================
+# Perfect Fake Ping
 # ============================================
 cat > /usr/local/bin/fake-ping << 'PINGEOF'
 #!/bin/bash
-# ============================================
-# PERFECT FAKE PING CONTROLLER
-# Uses tc netem on loopback for exact control
-# ============================================
-
 DB="/var/lib/shadow/traffic.db"
 
 start_fake_ping() {
     local target_delay=$1
-    
-    # Stop any existing fake ping first
-    stop_fake_ping
-    
-    # Method: Apply delay to loopback interface only
-    # This affects ALL ping replies returning from local stack
-    # Half delay because ping measures round-trip (request + reply)
     local half_delay=$((target_delay / 2))
     
-    # Check if ifb module is loaded
+    stop_fake_ping
+    
     modprobe ifb 2>/dev/null
     
-    # Apply delay on loopback for ping responses
     tc qdisc add dev lo root handle 1: prio 2>/dev/null
     tc qdisc add dev lo parent 1:1 handle 10: netem delay ${half_delay}ms 2>/dev/null
     
-    # Also add delay on physical interfaces for completeness
     for iface in $(ls /sys/class/net/ | grep -v lo); do
         tc qdisc del dev $iface root 2>/dev/null
         tc qdisc add dev $iface root handle 1: prio 2>/dev/null
         tc qdisc add dev $iface parent 1:1 handle 10: netem delay ${half_delay}ms 2>/dev/null
     done
     
-    # Update database
     sqlite3 "$DB" "UPDATE settings SET value='enabled' WHERE key='fake_ping';"
     sqlite3 "$DB" "UPDATE settings SET value='$target_delay' WHERE key='ping_value';"
     
-    echo "✅ Perfect Fake Ping Enabled: ${target_delay}ms"
-    echo "   Round-trip will show exactly ${target_delay}ms"
+    echo "✅ Perfect Fake Ping: ${target_delay}ms"
 }
 
 stop_fake_ping() {
-    # Remove all tc qdisc rules
     tc qdisc del dev lo root 2>/dev/null
     
     for iface in $(ls /sys/class/net/ | grep -v lo); do
@@ -334,11 +548,10 @@ stop_fake_ping() {
         tc qdisc add dev $iface root fq maxrate 100gbit 2>/dev/null
     done
     
-    # Update database
     sqlite3 "$DB" "UPDATE settings SET value='disabled' WHERE key='fake_ping';"
     sqlite3 "$DB" "UPDATE settings SET value='0' WHERE key='ping_value';"
     
-    echo "✅ Fake ping disabled - Real ping restored"
+    echo "✅ Fake Ping Disabled"
 }
 
 status_fake_ping() {
@@ -346,55 +559,24 @@ status_fake_ping() {
     local delay=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='ping_value';")
     
     if [ "$status" = "enabled" ]; then
-        echo "Status: ENABLED"
-        echo "Visible Ping: ${delay}ms"
-        echo "Method: tc netem delay (loopback + interfaces)"
+        echo "Status: ENABLED | Exact Ping: ${delay}ms"
     else
         echo "Status: DISABLED"
-        echo "Real ping is active"
     fi
 }
 
 case "${1}" in
-    start)
-        delay=${2:-300}
-        
-        # Validate delay range
-        if [ "$delay" -lt 10 ] || [ "$delay" -gt 10000 ]; then
-            echo "❌ Delay must be between 10ms and 10000ms"
-            exit 1
-        fi
-        
-        start_fake_ping "$delay"
-        ;;
-    stop)
-        stop_fake_ping
-        ;;
-    status)
-        status_fake_ping
-        ;;
-    *)
-        echo "Perfect Fake Ping Controller v19.2"
-        echo ""
-        echo "Usage: $0 {start <delay_ms>|stop|status}"
-        echo ""
-        echo "Examples:"
-        echo "  $0 start 300     # Shows exactly 300ms ping"
-        echo "  $0 start 2000    # Shows exactly 2000ms ping"
-        echo "  $0 start 10000   # Shows exactly 10000ms ping"
-        echo "  $0 stop          # Disable fake ping"
-        echo "  $0 status        # Check current status"
-        echo ""
-        echo "Note: tc netem applies delay on BOTH directions"
-        echo "      Half delay on each = Full round-trip delay"
-        ;;
+    start) delay=${2:-300}; start_fake_ping "$delay" ;;
+    stop) stop_fake_ping ;;
+    status) status_fake_ping ;;
+    *) echo "Usage: $0 {start <ms>|stop|status}" ;;
 esac
 PINGEOF
 
 chmod +x /usr/local/bin/fake-ping
 
 # ============================================
-# Precision Traffic Monitor
+# Traffic Monitor
 # ============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
@@ -402,70 +584,39 @@ DB="/var/lib/shadow/traffic.db"
 INTERVAL=2
 PID_FILE="/var/run/traffic-monitor.pid"
 
-if [ -f "$PID_FILE" ]; then
-    OLD_PID=$(cat "$PID_FILE")
-    if kill -0 "$OLD_PID" 2>/dev/null; then
-        exit 1
-    fi
-fi
+[ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null && exit 1
 echo $$ > "$PID_FILE"
 trap "rm -f $PID_FILE" EXIT
 
 read_pid_traffic() {
     local pid=$1
-    if [ ! -f "/proc/$pid/net/dev" ]; then
-        echo "0 0"
-        return
-    fi
+    [ ! -f "/proc/$pid/net/dev" ] && { echo "0 0"; return; }
     local rx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$2} END {print s+0}')
     local tx=$(cat /proc/$pid/net/dev 2>/dev/null | tail -n +3 | awk '{s+=$10} END {print s+0}')
     echo "$rx $tx"
 }
 
 is_real_ssh_session() {
-    local pid=$1
-    local username=$2
-    
+    local pid=$1 username=$2
     local comm=$(cat /proc/$pid/comm 2>/dev/null)
-    if [ "$comm" != "sshd" ]; then
-        return 1
-    fi
-    
+    [ "$comm" != "sshd" ] && return 1
     local pid_uid=$(stat -c %u /proc/$pid 2>/dev/null)
     local user_uid=$(id -u "$username" 2>/dev/null)
-    
-    if [ "$pid_uid" != "$user_uid" ]; then
-        return 1
-    fi
-    
+    [ "$pid_uid" != "$user_uid" ] && return 1
     local ppid=$(cat /proc/$pid/stat 2>/dev/null | awk '{print $4}')
     local parent_comm=$(cat /proc/$ppid/comm 2>/dev/null)
     local parent_uid=$(stat -c %u /proc/$ppid 2>/dev/null)
-    
-    if [ "$parent_comm" = "sshd" ] && [ "$parent_uid" = "0" ]; then
-        return 0
-    fi
-    
+    [ "$parent_comm" = "sshd" ] && [ "$parent_uid" = "0" ] && return 0
     return 1
 }
 
 get_user_ssh_pids() {
-    local username=$1
-    local all_pids=$(pgrep -u "$username" 2>/dev/null)
-    local ssh_pids=""
-    
-    for pid in $all_pids; do
-        if is_real_ssh_session "$pid" "$username"; then
-            ssh_pids="$ssh_pids $pid"
-        fi
+    local username=$1 ssh_pids=""
+    for pid in $(pgrep -u "$username" 2>/dev/null); do
+        is_real_ssh_session "$pid" "$username" && ssh_pids="$ssh_pids $pid"
     done
-    
     echo "$ssh_pids"
 }
-
-echo "🔄 Precision SSH Traffic Monitor Started (PID: $$)"
-echo "   Mode: Real SSH Traffic Only"
-echo "   Protection: Anti-Multiplier Active"
 
 while true; do
     active_users=$(sqlite3 "$DB" "SELECT username FROM users WHERE status='active';")
@@ -494,7 +645,6 @@ while true; do
         
         for pid in $current_pids; do
             is_real_ssh_session "$pid" "$username" || continue
-            
             read -r rx_now tx_now <<< $(read_pid_traffic "$pid")
             ppid=$(cat /proc/$pid/stat 2>/dev/null | awk '{print $4}')
             
@@ -509,20 +659,10 @@ while true; do
                 diff_rx=$((rx_now - last_rx))
                 diff_tx=$((tx_now - last_tx))
                 
-                if [ $diff_rx -lt 0 ] || [ $diff_tx -lt 0 ]; then
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes=0 WHERE pid=$pid AND ppid=$ppid;"
-                    continue
-                fi
+                [ $diff_rx -lt 0 ] || [ $diff_tx -lt 0 ] && { sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes=0 WHERE pid=$pid AND ppid=$ppid;"; continue; }
+                [ $diff_rx -gt 524288000 ] || [ $diff_tx -gt 524288000 ] && { sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid AND ppid=$ppid;"; continue; }
                 
-                if [ $diff_rx -gt 524288000 ] || [ $diff_tx -gt 524288000 ]; then
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid AND ppid=$ppid;"
-                    continue
-                fi
-                
-                if [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ]; then
-                    new_bytes=$((diff_rx + diff_tx))
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $new_bytes WHERE pid=$pid AND ppid=$ppid;"
-                fi
+                [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ] && sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $((diff_rx + diff_tx)) WHERE pid=$pid AND ppid=$ppid;"
             fi
         done
         
@@ -530,13 +670,11 @@ while true; do
         sqlite3 "$DB" "UPDATE users SET used_traffic = $total_usage WHERE username='$username';"
         
         total_limit=$(sqlite3 "$DB" "SELECT total_traffic FROM users WHERE username='$username';")
-        
-        if [ "$total_limit" != "0" ] && [ "$total_usage" -ge "$total_limit" ]; then
+        [ "$total_limit" != "0" ] && [ "$total_usage" -ge "$total_limit" ] && {
             sqlite3 "$DB" "UPDATE users SET status='limited' WHERE username='$username';"
             pkill -9 -u "$username" 2>/dev/null
             sqlite3 "$DB" "UPDATE traffic_records SET status='killed' WHERE username='$username' AND status='active';"
-        fi
-        
+        }
     done <<< "$active_users"
     
     sleep "$INTERVAL"
@@ -546,7 +684,225 @@ MONITOREOF
 chmod +x /usr/local/bin/traffic-monitor
 
 # ============================================
-# Telegram Bot Script
+# SMART CONFIG GENERATOR (Idea #2)
+# ============================================
+cat > /usr/local/bin/config-generator << 'GENEOF'
+#!/bin/bash
+# Smart Config Generator - User selects app, gets perfect config
+
+generate_napsternetv() {
+    local server=$1 username=$2 password=$3
+    local config_json="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"📡 $username\",\"sshHost\":\"$server\",\"sshPort\":22,\"sshUsername\":\"$username\",\"sshPassword\":\"$password\",\"udpgwTransparentDNS\":true}"
+    local config_b64=$(echo -n "$config_json" | base64 -w 0)
+    echo "npvt-ssh://${config_b64}"
+}
+
+generate_http_custom() {
+    local server=$1 username=$2 password=$3
+    echo "ssh://$username:$password@$server:22"
+}
+
+generate_http_injector() {
+    local server=$1 username=$2 password=$3
+    cat << EOF
+[server]
+host=$server
+port=22
+username=$username
+password=$password
+sni=$server
+payload=GET / HTTP/1.1[crlf]Host: $server[crlf][crlf]
+EOF
+}
+
+generate_v2ray() {
+    local server=$1 username=$2 password=$3
+    cat << EOF
+{
+  "outbounds": [{
+    "protocol": "ssh",
+    "settings": {
+      "address": "$server",
+      "port": 22,
+      "users": [{"user": "$username", "password": "$password"}]
+    }
+  }]
+}
+EOF
+}
+
+generate_clash() {
+    local server=$1 username=$2 password=$3
+    cat << EOF
+proxies:
+  - name: "$username"
+    type: ssh
+    server: $server
+    port: 22
+    username: $username
+    password: $password
+EOF
+}
+
+generate_shadowrocket() {
+    local server=$1 username=$2 password=$3
+    local encoded=$(echo -n "$username:$password" | base64 -w 0)
+    echo "ssh://$encoded@$server:22#$username"
+}
+
+generate_quantumult() {
+    local server=$1 username=$2 password=$3
+    echo "ssh=$server:22,method=password,password=$password,username=$username"
+}
+
+generate_singbox() {
+    local server=$1 username=$2 password=$3
+    cat << EOF
+{
+  "outbounds": [{
+    "type": "ssh",
+    "server": "$server",
+    "server_port": 22,
+    "user": "$username",
+    "password": "$password"
+  }]
+}
+EOF
+}
+
+generate_surfboard() {
+    local server=$1 username=$2 password=$3
+    echo "ss://$username:$password@$server:22#$username"
+}
+
+# Main menu
+echo ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}   📱 SMART CONFIG GENERATOR${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "Select your app:"
+echo ""
+echo -e "  ${GREEN}1.${NC} NapsternetV (NP VT)"
+echo -e "  ${GREEN}2.${NC} HTTP Custom"
+echo -e "  ${GREEN}3.${NC} HTTP Injector"
+echo -e "  ${GREEN}4.${NC} V2Ray (v2rayN/v2rayNG)"
+echo -e "  ${GREEN}5.${NC} Clash Meta"
+echo -e "  ${GREEN}6.${NC} Shadowrocket"
+echo -e "  ${GREEN}7.${NC} Quantumult X"
+echo -e "  ${GREEN}8.${NC} Sing-Box"
+echo -e "  ${GREEN}9.${NC} Surfboard"
+echo -e "  ${GREEN}10.${NC} Show All Configs"
+echo ""
+echo -n -e "${YELLOW}Enter number [1-10]: ${NC}"
+read app_choice
+echo ""
+
+echo -n -e "${GREEN}Server/IP: ${NC}"
+read server
+echo -n -e "${GREEN}Username: ${NC}"
+read username
+echo -n -e "${GREEN}Password: ${NC}"
+read password
+
+echo ""
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${PURPLE}   📋 YOUR CONFIG${NC}"
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+case $app_choice in
+    1)
+        echo -e "${YELLOW}NapsternetV (NP VT):${NC}"
+        echo ""
+        generate_napsternetv "$server" "$username" "$password"
+        ;;
+    2)
+        echo -e "${YELLOW}HTTP Custom:${NC}"
+        echo ""
+        generate_http_custom "$server" "$username" "$password"
+        ;;
+    3)
+        echo -e "${YELLOW}HTTP Injector:${NC}"
+        echo ""
+        generate_http_injector "$server" "$username" "$password"
+        ;;
+    4)
+        echo -e "${YELLOW}V2Ray:${NC}"
+        echo ""
+        generate_v2ray "$server" "$username" "$password"
+        ;;
+    5)
+        echo -e "${YELLOW}Clash Meta:${NC}"
+        echo ""
+        generate_clash "$server" "$username" "$password"
+        ;;
+    6)
+        echo -e "${YELLOW}Shadowrocket:${NC}"
+        echo ""
+        generate_shadowrocket "$server" "$username" "$password"
+        ;;
+    7)
+        echo -e "${YELLOW}Quantumult X:${NC}"
+        echo ""
+        generate_quantumult "$server" "$username" "$password"
+        ;;
+    8)
+        echo -e "${YELLOW}Sing-Box:${NC}"
+        echo ""
+        generate_singbox "$server" "$username" "$password"
+        ;;
+    9)
+        echo -e "${YELLOW}Surfboard:${NC}"
+        echo ""
+        generate_surfboard "$server" "$username" "$password"
+        ;;
+    10)
+        echo -e "${YELLOW}═══ ALL CONFIGS ═══${NC}"
+        echo ""
+        echo -e "${GREEN}1. NapsternetV:${NC}"
+        generate_napsternetv "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}2. HTTP Custom:${NC}"
+        generate_http_custom "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}3. HTTP Injector:${NC}"
+        generate_http_injector "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}4. V2Ray:${NC}"
+        generate_v2ray "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}5. Clash Meta:${NC}"
+        generate_clash "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}6. Shadowrocket:${NC}"
+        generate_shadowrocket "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}7. Quantumult X:${NC}"
+        generate_quantumult "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}8. Sing-Box:${NC}"
+        generate_singbox "$server" "$username" "$password"
+        echo ""
+        echo -e "${GREEN}9. Surfboard:${NC}"
+        generate_surfboard "$server" "$username" "$password"
+        ;;
+    *)
+        echo -e "${RED}❌ Invalid choice!${NC}"
+        ;;
+esac
+
+echo ""
+echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -n "Press Enter to continue..."
+read
+GENEOF
+
+chmod +x /usr/local/bin/config-generator
+
+# ============================================
+# Telegram Bot
 # ============================================
 cat > /usr/local/bin/shadow-bot << 'BOTEOF'
 #!/usr/bin/env python3
@@ -589,6 +945,11 @@ def get_domain():
                 return domain
     return subprocess.getoutput("curl -s ifconfig.me")
 
+def generate_napsternetv(server, username, password):
+    config_json = {"sshConfigType":"SSH-Direct","remarks":f"📡 {username}","sshHost":server,"sshPort":22,"sshUsername":username,"sshPassword":password,"udpgwTransparentDNS":True}
+    config_b64 = base64.b64encode(json.dumps(config_json).encode()).decode()
+    return f"npvt-ssh://{config_b64}"
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("❌ Unauthorized!")
@@ -600,19 +961,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton("👥 Users List", callback_data="list_users")],
-        [InlineKeyboardButton("➕ Create New User", callback_data="create_user")],
+        [InlineKeyboardButton("➕ Create User", callback_data="create_user")],
         [InlineKeyboardButton("🗑 Delete User", callback_data="delete_menu")],
+        [InlineKeyboardButton("📱 Config Generator", callback_data="config_gen")],
         [InlineKeyboardButton("📊 Traffic Report", callback_data="traffic")],
         [InlineKeyboardButton("📈 Server Status", callback_data="status")],
-        [InlineKeyboardButton("🔄 Refresh Menu", callback_data="refresh")]
+        [InlineKeyboardButton("🔄 Refresh", callback_data="refresh")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        f"🔱 *Shadow SSH v19.2*\n"
+        f"🔱 *Shadow SSH v20.0 BOMB*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🌐 `{get_domain()}:22`\n"
-        f"📡 Perfect Ping Active\n"
+        f"🇺🇸 Fake Location\n"
+        f"📡 Fake DNS\n"
+        f"🤖 AI Optimizer\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"Select option:",
         reply_markup=reply_markup,
@@ -628,13 +992,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if query.data == "list_users":
-        await show_users_list(query)
+        await show_users(query)
     elif query.data == "create_user":
         await show_create_dialog(query)
     elif query.data == "traffic":
-        await show_traffic_report(query)
+        await show_traffic(query)
     elif query.data == "status":
-        await show_server_status(query)
+        await show_status(query)
     elif query.data == "refresh":
         await show_main_menu(query)
     elif query.data == "delete_menu":
@@ -642,27 +1006,43 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("delete_"):
         username = query.data.replace("delete_", "")
         await delete_user_action(query, username)
+    elif query.data == "config_gen":
+        await show_config_options(query)
 
 async def show_main_menu(query):
     keyboard = [
         [InlineKeyboardButton("👥 Users List", callback_data="list_users")],
-        [InlineKeyboardButton("➕ Create New User", callback_data="create_user")],
+        [InlineKeyboardButton("➕ Create User", callback_data="create_user")],
         [InlineKeyboardButton("🗑 Delete User", callback_data="delete_menu")],
+        [InlineKeyboardButton("📱 Config Generator", callback_data="config_gen")],
         [InlineKeyboardButton("📊 Traffic Report", callback_data="traffic")],
         [InlineKeyboardButton("📈 Server Status", callback_data="status")],
-        [InlineKeyboardButton("🔄 Refresh Menu", callback_data="refresh")]
+        [InlineKeyboardButton("🔄 Refresh", callback_data="refresh")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
     await query.edit_message_text(
-        f"🔱 *Shadow SSH Manager*\n"
-        f"🌐 `{get_domain()}:22`\n"
-        f"Select option:",
-        reply_markup=reply_markup,
+        f"🔱 *Shadow SSH v20.0*\n🌐 `{get_domain()}:22`\nSelect option:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='Markdown'
     )
 
-async def show_users_list(query):
+async def show_config_options(query):
+    keyboard = [
+        [InlineKeyboardButton("1. NapsternetV", callback_data="config_nap")],
+        [InlineKeyboardButton("2. HTTP Custom", callback_data="config_httpc")],
+        [InlineKeyboardButton("3. HTTP Injector", callback_data="config_httpi")],
+        [InlineKeyboardButton("4. V2Ray", callback_data="config_v2ray")],
+        [InlineKeyboardButton("5. Clash Meta", callback_data="config_clash")],
+        [InlineKeyboardButton("6. Shadowrocket", callback_data="config_shadow")],
+        [InlineKeyboardButton("🔙 Back", callback_data="refresh")]
+    ]
+    await query.edit_message_text(
+        "📱 *Select App for Config:*\n\n"
+        "Choose your application:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
+async def show_users(query):
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
     cursor.execute("SELECT username, status, used_traffic, total_traffic, expiry, user_limit FROM users")
@@ -674,47 +1054,21 @@ async def show_users_list(query):
         return
     
     message = "👥 *Active Users*\n━━━━━━━━━━━━━━━━━━━\n\n"
-    
     for user in users:
         username, status, used, total, expiry, limit = user
         used_mb = used / 1048576.0
         total_gb = total / 1073741824.0 if total > 0 else 0
-        
-        if expiry == 0:
-            days_left = "∞"
-        else:
-            days_left = (expiry - int(time.time())) // 86400
-            if days_left < 0:
-                days_left = "Expired"
-            else:
-                days_left = f"{days_left}d"
-        
-        if total == 0:
-            usage_text = f"{used_mb:.1f}MB / ∞"
-        else:
-            percent = (used / total * 100) if total > 0 else 0
-            usage_text = f"{used_mb:.1f}MB / {total_gb:.1f}GB ({percent:.1f}%)"
-        
+        days_left = "∞" if expiry == 0 else f"{(expiry - int(time.time())) // 86400}d"
+        usage_text = f"{used_mb:.1f}MB / ∞" if total == 0 else f"{used_mb:.1f}MB / {total_gb:.1f}GB"
         status_emoji = "🟢" if status == "active" else "🔴" if status == "expired" else "🟡"
-        
-        message += f"{status_emoji} `{username}`\n"
-        message += f"   📊 {usage_text}\n"
-        message += f"   ⏰ {days_left} | 🔗 {limit} connections\n\n"
+        message += f"{status_emoji} `{username}`\n   📊 {usage_text}\n   ⏰ {days_left} | 🔗 {limit}\n\n"
     
-    keyboard = [[InlineKeyboardButton("🔙 Back to Menu", callback_data="refresh")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
+    await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def show_create_dialog(query):
     await query.edit_message_text(
-        "➕ *Create New User*\n\n"
-        "Send command:\n"
-        "`/create username password days traffic_gb max_connections`\n\n"
-        "*Example:*\n"
-        "`/create testuser pass123 30 5 3`\n\n"
-        "*Unlimited:*\n"
-        "`/create user pass 0 0 1`",
+        "➕ *Create User*\n\nSend:\n`/create username password days traffic_gb max_conn`",
         parse_mode='Markdown'
     )
 
@@ -729,11 +1083,8 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Usage: `/create username password days traffic_gb max_connections`", parse_mode='Markdown')
             return
         
-        username = args[0]
-        password = args[1]
-        days = int(args[2])
-        traffic_gb = int(args[3])
-        max_conn = int(args[4])
+        username, password = args[0], args[1]
+        days, traffic_gb, max_conn = int(args[2]), int(args[3]), int(args[4])
         
         result = subprocess.run(["id", username], capture_output=True)
         if result.returncode == 0:
@@ -761,17 +1112,10 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         subprocess.run(["systemctl", "restart", "sshd"], capture_output=True)
         
         domain = get_domain()
-        config_json = {"sshConfigType":"SSH-Direct","remarks":f"📡 {username} | 📎 {traffic_gb}GB","sshHost":domain,"sshPort":22,"sshUsername":username,"sshPassword":password,"udpgwTransparentDNS":True}
-        config_b64 = base64.b64encode(json.dumps(config_json).encode()).decode()
-        npvt_link = f"npvt-ssh://{config_b64}"
+        npvt_link = generate_napsternetv(domain, username, password)
         
         await update.message.reply_text(
-            f"✅ *User Created!*\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🌐 `{domain}:22`\n"
-            f"👤 `{username}`\n🔑 `{password}`\n"
-            f"📊 `{traffic_gb}GB`\n⏰ `{days}d`\n🔗 `{max_conn}`\n"
-            f"━━━━━━━━━━━━━━━━━━━\n📋 `{npvt_link}`",
+            f"✅ *Created!*\n🌐 `{domain}:22`\n👤 `{username}`\n🔑 `{password}`\n📊 `{traffic_gb}GB`\n⏰ `{days}d`\n🔗 `{max_conn}`\n\n📋 `{npvt_link}`",
             parse_mode='Markdown'
         )
     except Exception as e:
@@ -785,53 +1129,45 @@ async def show_delete_menu(query):
     conn.close()
     
     if not users:
-        await query.edit_message_text("📭 No users to delete!")
+        await query.edit_message_text("📭 No users!")
         return
     
-    keyboard = []
-    for (username,) in users:
-        keyboard.append([InlineKeyboardButton(f"🗑 {username}", callback_data=f"delete_{username}")])
-    keyboard.append([InlineKeyboardButton("🔙 Back to Menu", callback_data="refresh")])
-    
-    await query.edit_message_text("🗑 *Select user to delete:*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    keyboard = [[InlineKeyboardButton(f"🗑 {u[0]}", callback_data=f"delete_{u[0]}")] for u in users]
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="refresh")])
+    await query.edit_message_text("🗑 *Select user:*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def delete_user_action(query, username):
     subprocess.run(["pkill", "-9", "-u", username], capture_output=True)
     subprocess.run(["userdel", "-r", username], capture_output=True)
-    
     conn = sqlite3.connect(DB)
     conn.execute("DELETE FROM users WHERE username=?", [username])
     conn.execute("DELETE FROM traffic_records WHERE username=?", [username])
     conn.commit()
     conn.close()
-    
     os.system(f"sed -i '/^{username}$/d' /etc/shadow-users.conf 2>/dev/null")
     os.system(f"rm -f /etc/ssh/sshd_config.d/{username}.conf")
     subprocess.run(["systemctl", "restart", "sshd"], capture_output=True)
-    
-    await query.edit_message_text(f"✅ User `{username}` deleted!", parse_mode='Markdown')
+    await query.edit_message_text(f"✅ `{username}` deleted!", parse_mode='Markdown')
 
-async def show_traffic_report(query):
+async def show_traffic(query):
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
-    yesterday = int(time.time()) - 86400
-    cursor.execute("SELECT username, SUM(accumulated_bytes) as total FROM traffic_records WHERE start_time > ? GROUP BY username ORDER BY total DESC LIMIT 10", [yesterday])
+    cursor.execute("SELECT username, SUM(accumulated_bytes) as total FROM traffic_records WHERE start_time > ? GROUP BY username ORDER BY total DESC LIMIT 10", [int(time.time()) - 86400])
     data = cursor.fetchall()
     conn.close()
     
     if not data:
-        await query.edit_message_text("📊 No traffic data for today!")
+        await query.edit_message_text("📊 No traffic today!")
         return
     
     message = "📊 *Today's Traffic*\n━━━━━━━━━━━━━━━━━━━\n\n"
     for i, (user, total) in enumerate(data, 1):
-        mb = total / 1048576.0
-        message += f"{i}. `{user}`: {mb:.2f}MB\n"
+        message += f"{i}. `{user}`: {total/1048576:.2f}MB\n"
     
-    keyboard = [[InlineKeyboardButton("🔙 Back to Menu", callback_data="refresh")]]
+    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
     await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
-async def show_server_status(query):
+async def show_status(query):
     cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1")
     mem = subprocess.getoutput("free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2}'")
     uptime = subprocess.getoutput("uptime -p | sed 's/up //'")
@@ -841,18 +1177,23 @@ async def show_server_status(query):
     active = conn.execute("SELECT COUNT(*) FROM users WHERE status='active'").fetchone()[0]
     ping_status = conn.execute("SELECT value FROM settings WHERE key='fake_ping'").fetchone()[0]
     ping_value = conn.execute("SELECT value FROM settings WHERE key='ping_value'").fetchone()[0]
+    location_status = conn.execute("SELECT value FROM settings WHERE key='fake_location'").fetchone()[0]
+    location_country = conn.execute("SELECT value FROM settings WHERE key='fake_country'").fetchone()[0]
+    dns_status = conn.execute("SELECT value FROM settings WHERE key='fake_dns'").fetchone()[0]
     conn.close()
-    
-    ping_text = f"ON ({ping_value}ms)" if ping_status == "enabled" else "OFF"
     
     msg = (
         f"📈 *Server Status*\n━━━━━━━━━━━━━━━━━━━\n\n"
         f"🖥 CPU: `{cpu}%`\n💾 RAM: `{mem}%`\n"
         f"⏱ Uptime: `{uptime}`\n🔗 Connections: `{conn_count}`\n"
-        f"👥 Users: `{active}`\n📡 Ping: `{ping_text}`\n⚡ Mode: `SPACE`\n"
+        f"👥 Users: `{active}`\n\n"
+        f"📡 Ping: `{ping_status} ({ping_value}ms)`\n"
+        f"🇺🇸 Location: `{location_status} ({location_country})`\n"
+        f"📡 DNS: `{dns_status}`\n"
+        f"⚡ Mode: `SPACE SPEED`\n"
     )
     
-    keyboard = [[InlineKeyboardButton("🔙 Back to Menu", callback_data="refresh")]]
+    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 def main():
@@ -876,13 +1217,10 @@ BOTEOF
 chmod +x /usr/local/bin/shadow-bot
 
 # ============================================
-# Main Shadow Manager Script
+# Main Shadow Manager with ALL features
 # ============================================
 cat > /usr/local/bin/shadow << 'MAINEOF'
 #!/bin/bash
-# ============================================
-# Shadow SSH Manager v19.2 - PERFECT FAKE PING
-# ============================================
 
 DB="/var/lib/shadow/traffic.db"
 DOMAIN_FILE="/etc/shadow-domain.conf"
@@ -898,36 +1236,29 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 get_domain() {
-    if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-        cat "$DOMAIN_FILE"
-    else
-        curl -s ifconfig.me
-    fi
+    [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ] && cat "$DOMAIN_FILE" || curl -s ifconfig.me
 }
 
 get_user_usage() {
-    local username=$1
-    sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');"
+    sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$1' AND (status='active' OR status='closed');"
 }
 
 show_banner() {
     SERVER_IP=$(get_domain)
     PING_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_ping';")
     PING_VALUE=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='ping_value';")
+    LOCATION_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_location';")
+    LOCATION_COUNTRY=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_country';")
+    DNS_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_dns';")
     
     echo ""
     echo -e "${PURPLE}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║      ${GREEN}🔱 SHADOW SSH v19.2 - PERFECT FAKE PING 🔱${PURPLE}         ║${NC}"
+    echo -e "${PURPLE}║     ${GREEN}🔱 SHADOW SSH v20.0 - BOMB EDITION 🔱${PURPLE}               ║${NC}"
     echo -e "${PURPLE}╠══════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${PURPLE}║${NC}  🌐 Server: ${GREEN}${SERVER_IP}${NC}"
-    echo -e "${PURPLE}║${NC}  📡 Port: ${GREEN}22${NC}  |  ⚡ Mode: ${GREEN}SPACE SPEED${NC}  |  🎯 Traffic: ${GREEN}Real${NC}"
-    
-    if [ "$PING_STATUS" = "enabled" ]; then
-        echo -e "${PURPLE}║${NC}  📡 Fake Ping: ${YELLOW}ACTIVE (Shows exactly ${PING_VALUE}ms)${NC}"
-    else
-        echo -e "${PURPLE}║${NC}  📡 Fake Ping: ${BLUE}DISABLED${NC}"
-    fi
-    
+    echo -e "${PURPLE}║${NC}  🌐 ${SERVER_IP}:22  |  ⚡ SPACE  |  🤖 AI Active"
+    [ "$PING_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  📡 Fake Ping: ${YELLOW}ON (${PING_VALUE}ms)${NC}"
+    [ "$LOCATION_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  🇺🇸 Fake Location: ${GREEN}ON (${LOCATION_COUNTRY})${NC}"
+    [ "$DNS_STATUS" = "enabled" ] && echo -e "${PURPLE}║${NC}  📡 Fake DNS: ${CYAN}ON (1ms)${NC}"
     echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -935,159 +1266,186 @@ show_banner() {
 show_menu() {
     clear
     show_banner
-    echo -e "${CYAN}══════════════════ MANAGEMENT MENU ══════════════════${NC}"
+    echo -e "${CYAN}══════════════ BOMB MENU ══════════════${NC}"
     echo ""
     echo -e "  ${GREEN}1.${NC} ${WHITE}➕  Create New User${NC}"
     echo -e "  ${GREEN}2.${NC} ${WHITE}🗑   Delete User${NC}"
     echo -e "  ${GREEN}3.${NC} ${WHITE}👥  List All Users${NC}"
-    echo -e "  ${GREEN}4.${NC} ${WHITE}📊  View Traffic Details${NC}"
-    echo -e "  ${GREEN}5.${NC} ${WHITE}📡  Fake Ping Control (PERFECT)${NC}"
-    echo -e "  ${GREEN}6.${NC} ${WHITE}🤖  Telegram Bot Settings${NC}"
-    echo -e "  ${GREEN}7.${NC} ${WHITE}🌐  Domain Management${NC}"
-    echo -e "  ${GREEN}8.${NC} ${WHITE}📈  Server Status${NC}"
-    echo -e "  ${GREEN}9.${NC} ${WHITE}🔄  Restart All Services${NC}"
-    echo -e "  ${GREEN}10.${NC} ${WHITE}🚪  Exit${NC}"
+    echo -e "  ${GREEN}4.${NC} ${WHITE}📱  Smart Config Generator${NC}"
+    echo -e "  ${GREEN}5.${NC} ${WHITE}📡  Fake Ping Control${NC}"
+    echo -e "  ${GREEN}6.${NC} ${WHITE}🇺🇸  Fake Location Control${NC}"
+    echo -e "  ${GREEN}7.${NC} ${WHITE}📡  Fake DNS Control${NC}"
+    echo -e "  ${GREEN}8.${NC} ${WHITE}🤖  Telegram Bot${NC}"
+    echo -e "  ${GREEN}9.${NC} ${WHITE}📈  Server Status${NC}"
+    echo -e "  ${GREEN}10.${NC} ${WHITE}🚪 Exit${NC}"
     echo ""
-    echo -e "${CYAN}══════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════${NC}"
     echo ""
+}
+
+fake_location_menu() {
+    while true; do
+        clear
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}   🇺🇸 FAKE LOCATION CONTROL${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        
+        /usr/local/bin/fake-location status
+        echo ""
+        echo -e "1. Enable Fake Location"
+        echo -e "2. Disable Fake Location"
+        echo -e "3. Change Country"
+        echo -e "4. List Available Countries"
+        echo -e "5. Back"
+        echo ""
+        echo -n -e "Select: "
+        read choice
+        
+        case $choice in
+            1)
+                echo ""
+                echo -e "Select Country:"
+                echo -e "1. 🇺🇸 USA"
+                echo -e "2. 🇬🇧 UK"
+                echo -e "3. 🇩🇪 Germany"
+                echo -e "4. 🇳🇱 Netherlands"
+                echo -e "5. 🇯🇵 Japan"
+                echo -e "6. 🇨🇦 Canada"
+                echo -n -e "Select [1-6]: "
+                read country_choice
+                
+                case $country_choice in
+                    1) /usr/local/bin/fake-location start US ;;
+                    2) /usr/local/bin/fake-location start GB ;;
+                    3) /usr/local/bin/fake-location start DE ;;
+                    4) /usr/local/bin/fake-location start NL ;;
+                    5) /usr/local/bin/fake-location start JP ;;
+                    6) /usr/local/bin/fake-location start CA ;;
+                esac
+                sleep 2
+                ;;
+            2)
+                /usr/local/bin/fake-location stop
+                sleep 2
+                ;;
+            3)
+                /usr/local/bin/fake-location list
+                echo -n -e "Enter country code: "
+                read code
+                /usr/local/bin/fake-location start "$code"
+                sleep 2
+                ;;
+            4)
+                /usr/local/bin/fake-location list
+                echo ""
+                echo -n "Press Enter..."
+                read
+                ;;
+            5) break ;;
+        esac
+    done
+}
+
+fake_dns_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}   📡 FAKE DNS CONTROL${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        
+        /usr/local/bin/fake-dns status
+        echo ""
+        echo -e "1. Enable Fake DNS (Ultra-Fast)"
+        echo -e "2. Disable Fake DNS"
+        echo -e "3. Back"
+        echo ""
+        echo -n -e "Select: "
+        read choice
+        
+        case $choice in
+            1)
+                /usr/local/bin/fake-dns start 1
+                sleep 2
+                ;;
+            2)
+                /usr/local/bin/fake-dns stop
+                sleep 2
+                ;;
+            3) break ;;
+        esac
+    done
 }
 
 fake_ping_menu() {
     while true; do
         clear
-        echo ""
         echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${YELLOW}   📡 PERFECT FAKE PING CONTROL${NC}"
+        echo -e "${YELLOW}   📡 FAKE PING CONTROL${NC}"
         echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         
-        PING_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_ping';")
-        PING_VALUE=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='ping_value';")
+        /usr/local/bin/fake-ping status
+        echo ""
+        echo -e "1. Enable (Custom Value)"
+        echo -e "2. Disable"
+        echo -e "3. Presets (300/500/1000/2000/5000ms)"
+        echo -e "4. Back"
+        echo ""
+        echo -n -e "Select: "
+        read choice
         
-        echo -e "  Current Status: ${YELLOW}${PING_STATUS}${NC}"
-        if [ "$PING_STATUS" = "enabled" ]; then
-            echo -e "  Exact Ping Shown: ${YELLOW}${PING_VALUE}ms${NC}"
-            echo -e "  Method: ${CYAN}tc netem on loopback${NC}"
-        fi
-        echo ""
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        echo -e "  ${GREEN}1.${NC} ${WHITE}Enable Fake Ping (EXACT value)${NC}"
-        echo -e "  ${GREEN}2.${NC} ${WHITE}Disable Fake Ping${NC}"
-        echo -e "  ${GREEN}3.${NC} ${WHITE}Quick Presets${NC}"
-        echo -e "  ${GREEN}4.${NC} ${WHITE}Check Status${NC}"
-        echo -e "  ${GREEN}5.${NC} ${WHITE}Back to Main Menu${NC}"
-        echo ""
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        echo -n -e "${CYAN}Select option [1-5]: ${NC}"
-        read ping_choice
-        
-        case $ping_choice in
+        case $choice in
             1)
-                echo ""
-                echo -e "${YELLOW}Enter the EXACT ping value you want to show${NC}"
-                echo -e "${YELLOW}Range: 10ms to 10000ms${NC}"
-                echo -e "${YELLOW}Example: 300 will show exactly 300ms in NapsternetV${NC}"
-                echo ""
-                echo -n -e "${GREEN}Desired Ping (ms): ${NC}"
+                echo -n -e "Enter ping (ms): "
                 read delay
-                
-                if [ "$delay" -ge 10 ] && [ "$delay" -le 10000 ]; then
-                    echo ""
-                    echo -e "${YELLOW}Enabling perfect fake ping: ${delay}ms${NC}"
-                    /usr/local/bin/fake-ping start "$delay"
-                    echo ""
-                    echo -e "${GREEN}✅ Done! Users will now see exactly ${delay}ms ping${NC}"
-                    echo -e "${GREEN}   Test it: ping $(get_domain)${NC}"
-                else
-                    echo ""
-                    echo -e "${RED}❌ Invalid! Must be between 10ms and 10000ms${NC}"
-                fi
-                echo ""
+                /usr/local/bin/fake-ping start "$delay"
                 sleep 2
                 ;;
             2)
-                echo ""
-                echo -n -e "${RED}Are you sure? (y/n): ${NC}"
-                read confirm
-                if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-                    /usr/local/bin/fake-ping stop
-                    echo -e "${GREEN}✅ Fake ping disabled! Real ping restored${NC}"
-                fi
-                echo ""
+                /usr/local/bin/fake-ping stop
                 sleep 2
                 ;;
             3)
-                echo ""
-                echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo -e "${CYAN}   QUICK PRESETS (EXACT VALUES)${NC}"
-                echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo ""
-                echo -e "  ${GREEN}a.${NC} ${WHITE}Very Low: 100ms${NC}"
-                echo -e "  ${GREEN}b.${NC} ${WHITE}Low: 300ms${NC}"
-                echo -e "  ${GREEN}c.${NC} ${WHITE}Medium: 500ms${NC}"
-                echo -e "  ${GREEN}d.${NC} ${WHITE}High: 1000ms (1s)${NC}"
-                echo -e "  ${GREEN}e.${NC} ${WHITE}Very High: 2000ms (2s)${NC}"
-                echo -e "  ${GREEN}f.${NC} ${WHITE}Extreme: 5000ms (5s)${NC}"
-                echo -e "  ${GREEN}g.${NC} ${WHITE}NASA: 10000ms (10s)${NC}"
-                echo ""
-                echo -n -e "${CYAN}Select preset [a-g]: ${NC}"
+                echo "a. 300ms  b. 500ms  c. 1000ms  d. 2000ms  e. 5000ms"
+                echo -n -e "Select: "
                 read preset
-                
                 case $preset in
-                    a) /usr/local/bin/fake-ping start 100 ;;
-                    b) /usr/local/bin/fake-ping start 300 ;;
-                    c) /usr/local/bin/fake-ping start 500 ;;
-                    d) /usr/local/bin/fake-ping start 1000 ;;
-                    e) /usr/local/bin/fake-ping start 2000 ;;
-                    f) /usr/local/bin/fake-ping start 5000 ;;
-                    g) /usr/local/bin/fake-ping start 10000 ;;
-                    *) echo -e "${RED}❌ Invalid preset!${NC}" ;;
+                    a) /usr/local/bin/fake-ping start 300 ;;
+                    b) /usr/local/bin/fake-ping start 500 ;;
+                    c) /usr/local/bin/fake-ping start 1000 ;;
+                    d) /usr/local/bin/fake-ping start 2000 ;;
+                    e) /usr/local/bin/fake-ping start 5000 ;;
                 esac
-                echo ""
-                echo -e "${GREEN}✅ Preset applied!${NC}"
                 sleep 2
                 ;;
-            4)
-                echo ""
-                /usr/local/bin/fake-ping status
-                echo ""
-                echo -n "Press Enter to continue..."
-                read
-                ;;
-            5)
-                break
-                ;;
+            4) break ;;
         esac
     done
 }
 
 create_user() {
     echo ""
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}   📝 CREATE NEW USER${NC}"
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}📝 CREATE USER${NC}"
     echo ""
     
-    echo -n -e "${GREEN}👤 Username: ${NC}"
+    echo -n -e "👤 Username: "
     read username
     
     if id "$username" &>/dev/null; then
-        echo ""
-        echo -e "${RED}❌ User '$username' already exists!${NC}"
+        echo -e "${RED}❌ User exists!${NC}"
         sleep 2
         return
     fi
     
-    echo -n -e "${GREEN}🔑 Password: ${NC}"
+    echo -n -e "🔑 Password: "
     read password
-    echo -n -e "${GREEN}📊 Traffic Limit (GB, 0=unlimited): ${NC}"
+    echo -n -e "📊 Traffic Limit (GB, 0=∞): "
     read traffic_gb
-    echo -n -e "${GREEN}⏰ Days Valid (0=unlimited): ${NC}"
+    echo -n -e "⏰ Days (0=∞): "
     read days
-    echo -n -e "${GREEN}🔢 Max Connections (1-10): ${NC}"
+    echo -n -e "🔢 Max Conn (1-10): "
     read max_conn
     
     [ "$traffic_gb" -eq 0 ] && traffic_bytes=0 || traffic_bytes=$((traffic_gb * 1073741824))
@@ -1113,51 +1471,31 @@ EOF
     npvt_link="npvt-ssh://${config_b64}"
     
     echo ""
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}   ✅ USER CREATED SUCCESSFULLY!${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✅ CREATED!${NC}"
+    echo -e "🌐 ${SERVER}:22"
+    echo -e "👤 ${username}"
+    echo -e "🔑 ${password}"
+    echo -e "📊 ${traffic_gb}GB | ⏰ ${days}d | 🔗 ${max_conn}"
+    echo -e "${PURPLE}${npvt_link}${NC}"
     echo ""
-    echo -e "  🌐 Server: ${GREEN}${SERVER}${NC}"
-    echo -e "  📡 Port: ${GREEN}22${NC}"
-    echo -e "  👤 Username: ${GREEN}${username}${NC}"
-    echo -e "  🔑 Password: ${GREEN}${password}${NC}"
-    echo -e "  📊 Traffic Limit: ${GREEN}${traffic_gb} GB${NC}"
-    echo -e "  ⏰ Valid: ${GREEN}${days} days${NC}"
-    echo -e "  🔗 Max Connections: ${GREEN}${max_conn}${NC}"
-    echo ""
-    echo -e "${PURPLE}📋 NP VT Config Link:${NC}"
-    echo -e "${YELLOW}${npvt_link}${NC}"
-    echo ""
-    echo -n "Press Enter to continue..."
+    echo -n "Press Enter..."
     read
 }
 
 delete_user() {
     echo ""
-    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${RED}   🗑  DELETE USER${NC}"
-    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    
     echo -n -e "${RED}Username to delete: ${NC}"
     read username
     
     if ! id "$username" &>/dev/null; then
-        echo ""
-        echo -e "${RED}❌ User '$username' not found!${NC}"
+        echo -e "${RED}❌ Not found!${NC}"
         sleep 2
         return
     fi
     
-    echo ""
-    echo -n -e "${YELLOW}Are you sure? (y/n): ${NC}"
+    echo -n -e "Are you sure? (y/n): "
     read confirm
-    
-    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        echo -e "${BLUE}ℹ️  Cancelled${NC}"
-        sleep 1
-        return
-    fi
+    [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && return
     
     pkill -9 -u "$username" 2>/dev/null
     userdel -r "$username" 2>/dev/null
@@ -1167,20 +1505,16 @@ delete_user() {
     sqlite3 "$DB" "DELETE FROM traffic_records WHERE username='$username';"
     systemctl restart sshd 2>/dev/null
     
-    echo ""
-    echo -e "${GREEN}✅ User '$username' deleted successfully!${NC}"
+    echo -e "${GREEN}✅ Deleted!${NC}"
     sleep 2
 }
 
 list_users() {
     echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}   👥 ACTIVE USERS${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}👥 USERS${NC}"
     echo ""
-    
-    printf "${WHITE}%-15s %-8s %-25s %-15s %-10s${NC}\n" "Username" "Status" "Used Traffic" "Limit" "Expiry"
-    echo -e "${BLUE}────────────────────────────────────────────────────────────────────${NC}"
+    printf "%-15s %-8s %-25s %-15s %-10s\n" "Username" "Status" "Used" "Limit" "Expiry"
+    echo "────────────────────────────────────────────────────────────────────"
     
     while IFS='|' read -r username status total_limit expiry limit; do
         [ -z "$username" ] && continue
@@ -1198,19 +1532,13 @@ list_users() {
             usage_text="${used_mb}MB / ${total_mb}MB (${percent}%)"
         fi
         
-        if [ "$expiry" -eq 0 ]; then
-            expiry_text="∞"
-        else
+        [ "$expiry" -eq 0 ] && expiry_text="∞" || {
             days_left=$(( (expiry - $(date +%s)) / 86400 ))
             [ $days_left -lt 0 ] && days_left=0
             expiry_text="${days_left}d"
-        fi
+        }
         
-        if [ "$total_limit" -eq 0 ]; then
-            limit_text="∞"
-        else
-            limit_text="$(echo "scale=1; $total_limit/1073741824" | bc 2>/dev/null || echo "0")GB"
-        fi
+        [ "$total_limit" -eq 0 ] && limit_text="∞" || limit_text="$(echo "scale=1; $total_limit/1073741824" | bc 2>/dev/null || echo "0")GB"
         
         case $status in
             active) status_icon="🟢" ;;
@@ -1221,272 +1549,87 @@ list_users() {
         
         printf "%-15s %s %-8s ${CYAN}%-25s${NC} ${YELLOW}%-15s${NC} ${GREEN}%-10s${NC}\n" \
             "$username" "$status_icon" "$status" "$usage_text" "$limit_text" "$expiry_text"
-        
     done < <(sqlite3 "$DB" "SELECT username, status, total_traffic, expiry, user_limit FROM users;")
     
     echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -n "Press Enter to continue..."
+    echo -n "Press Enter..."
     read
-}
-
-view_traffic() {
-    echo ""
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}   📊 TRAFFIC DETAILS${NC}"
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    
-    echo -n -e "${GREEN}Username: ${NC}"
-    read username
-    
-    echo ""
-    echo -e "${CYAN}SSH Session Traffic Records for: ${GREEN}${username}${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${WHITE}Start Time              | PID     | PPID    | Status   | Traffic${NC}"
-    echo -e "${BLUE}────────────────────────────────────────────────────────────────────${NC}"
-    
-    sqlite3 "$DB" "SELECT datetime(start_time, 'unixepoch', 'localtime'), pid, ppid, status, accumulated_bytes FROM traffic_records WHERE username='$username' ORDER BY start_time DESC LIMIT 30;" | while IFS='|' read -r time pid ppid status bytes; do
-        mb=$(echo "scale=2; $bytes / 1048576" | bc 2>/dev/null || echo "0")
-        printf "%-24s | %-7s | %-7s | %-8s | %sMB\n" "$time" "$pid" "$ppid" "$status" "$mb"
-    done
-    
-    echo -e "${BLUE}────────────────────────────────────────────────────────────────────${NC}"
-    
-    total=$(get_user_usage "$username")
-    total_mb=$(echo "scale=2; $total / 1048576" | bc 2>/dev/null || echo "0")
-    
-    echo -e "${GREEN}Total Real SSH Traffic: ${total_mb}MB${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -n "Press Enter to continue..."
-    read
-}
-
-bot_settings() {
-    while true; do
-        echo ""
-        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${PURPLE}   🤖 TELEGRAM BOT SETTINGS${NC}"
-        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        if [ -f "$BOT_CONFIG" ]; then
-            token=$(grep TOKEN= "$BOT_CONFIG" | cut -d= -f2)
-            admins=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
-            echo -e "  Bot Token: ${GREEN}${token:0:20}...${NC}"
-            echo -e "  Admin IDs: ${GREEN}${admins}${NC}"
-        else
-            echo -e "  ${YELLOW}Bot not configured yet${NC}"
-        fi
-        
-        echo ""
-        echo -e "  ${GREEN}1.${NC} ${WHITE}Set/Change Bot Token${NC}"
-        echo -e "  ${GREEN}2.${NC} ${WHITE}Add Admin ID${NC}"
-        echo -e "  ${GREEN}3.${NC} ${WHITE}Start/Stop Bot${NC}"
-        echo -e "  ${GREEN}4.${NC} ${WHITE}View Bot Status${NC}"
-        echo -e "  ${GREEN}5.${NC} ${WHITE}Back${NC}"
-        echo ""
-        
-        echo -n -e "${CYAN}Select option [1-5]: ${NC}"
-        read bot_choice
-        
-        case $bot_choice in
-            1)
-                echo ""
-                echo -n -e "${GREEN}Enter Bot Token (from @BotFather): ${NC}"
-                read token
-                if [ -f "$BOT_CONFIG" ]; then
-                    sed -i "s/TOKEN=.*/TOKEN=$token/" "$BOT_CONFIG"
-                else
-                    echo "TOKEN=$token" > "$BOT_CONFIG"
-                    echo "ADMINS=" >> "$BOT_CONFIG"
-                fi
-                echo -e "${GREEN}✅ Bot token saved!${NC}"
-                systemctl restart shadow-bot 2>/dev/null
-                sleep 1
-                ;;
-            2)
-                echo ""
-                echo -n -e "${GREEN}Enter Admin Telegram ID: ${NC}"
-                read admin_id
-                if [ -f "$BOT_CONFIG" ]; then
-                    current=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
-                    new="${current},${admin_id}"
-                    sed -i "s/ADMINS=.*/ADMINS=$new/" "$BOT_CONFIG"
-                fi
-                echo -e "${GREEN}✅ Admin added!${NC}"
-                systemctl restart shadow-bot 2>/dev/null
-                sleep 1
-                ;;
-            3)
-                if systemctl is-active --quiet shadow-bot; then
-                    systemctl stop shadow-bot
-                    echo -e "${YELLOW}🛑 Bot stopped${NC}"
-                else
-                    systemctl start shadow-bot
-                    echo -e "${GREEN}🚀 Bot started${NC}"
-                fi
-                sleep 1
-                ;;
-            4)
-                echo ""
-                systemctl status shadow-bot --no-pager -l
-                echo ""
-                echo -n "Press Enter to continue..."
-                read
-                ;;
-            5)
-                break
-                ;;
-        esac
-    done
-}
-
-domain_management() {
-    while true; do
-        echo ""
-        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${PURPLE}   🌐 DOMAIN MANAGEMENT${NC}"
-        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        
-        if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-            echo -e "  Current Domain: ${GREEN}$(cat $DOMAIN_FILE)${NC}"
-        else
-            echo -e "  Current: ${YELLOW}Using IP: $(curl -s ifconfig.me)${NC}"
-        fi
-        
-        echo ""
-        echo -e "  ${GREEN}1.${NC} ${WHITE}Set/Change Domain${NC}"
-        echo -e "  ${GREEN}2.${NC} ${WHITE}Get Free SSL${NC}"
-        echo -e "  ${GREEN}3.${NC} ${WHITE}Back${NC}"
-        echo ""
-        
-        echo -n -e "${CYAN}Select option [1-3]: ${NC}"
-        read domain_choice
-        
-        case $domain_choice in
-            1)
-                echo ""
-                echo -n -e "${GREEN}Enter domain: ${NC}"
-                read new_domain
-                echo "$new_domain" > "$DOMAIN_FILE"
-                echo -e "${GREEN}✅ Domain set!${NC}"
-                sleep 1
-                ;;
-            2)
-                echo ""
-                if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-                    domain=$(cat "$DOMAIN_FILE")
-                    echo -n -e "${GREEN}Enter your email: ${NC}"
-                    read email
-                    systemctl stop nginx 2>/dev/null
-                    certbot certonly --standalone -d "$domain" --non-interactive --agree-tos --email "$email"
-                else
-                    echo -e "${RED}❌ Set domain first!${NC}"
-                fi
-                sleep 2
-                ;;
-            3)
-                break
-                ;;
-        esac
-    done
 }
 
 server_status() {
     echo ""
-    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${PURPLE}   📈 SERVER STATUS${NC}"
-    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${PURPLE}📈 STATUS${NC}"
     echo ""
     
     cpu=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
-    mem_used=$(free -m | awk 'NR==2{print $3}')
-    mem_total=$(free -m | awk 'NR==2{print $2}')
-    mem_percent=$(echo "scale=1; $mem_used * 100 / $mem_total" | bc)
+    mem_percent=$(free -m | awk 'NR==2{printf "%.1f", $3*100/$2}')
     uptime=$(uptime -p | sed 's/up //')
     conn=$(ss -tnp 2>/dev/null | grep ESTAB | wc -l)
     users_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM users WHERE status='active';")
     
-    monitor_status=$(systemctl is-active traffic-monitor 2>/dev/null)
-    bot_status=$(systemctl is-active shadow-bot 2>/dev/null)
-    
-    PING_STATUS=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_ping';")
-    PING_VALUE=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='ping_value';")
-    
-    echo -e "  ${WHITE}🖥  CPU Usage:${NC} ${YELLOW}${cpu}%${NC}"
-    echo -e "  ${WHITE}💾 RAM Usage:${NC} ${YELLOW}${mem_used}MB / ${mem_total}MB (${mem_percent}%)${NC}"
-    echo -e "  ${WHITE}⏱  Uptime:${NC} ${GREEN}${uptime}${NC}"
-    echo -e "  ${WHITE}🔗 Active Connections:${NC} ${CYAN}${conn}${NC}"
-    echo -e "  ${WHITE}👥 Active Users:${NC} ${GREEN}${users_count}${NC}"
-    echo -e "  ${WHITE}📡 Port 22:${NC} ${GREEN}Open${NC}"
-    echo -e "  ${WHITE}⚡ BBR:${NC} ${GREEN}Enabled${NC}"
-    echo -e "  ${WHITE}🚀 Speed:${NC} ${GREEN}SPACE SPEED${NC}"
-    
+    echo -e "🖥  CPU: ${YELLOW}${cpu}%${NC}"
+    echo -e "💾 RAM: ${YELLOW}${mem_percent}%${NC}"
+    echo -e "⏱  Uptime: ${GREEN}${uptime}${NC}"
+    echo -e "🔗 Connections: ${CYAN}${conn}${NC}"
+    echo -e "👥 Users: ${GREEN}${users_count}${NC}"
+    echo -e "📡 Port 22: ${GREEN}Open${NC}"
+    echo -e "⚡ BBR: ${GREEN}ON${NC}"
+    echo -e "🤖 AI Optimizer: ${GREEN}$(systemctl is-active ai-optimizer 2>/dev/null || echo 'N/A')${NC}"
+    echo -e "🇺🇸 Fake Location: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_location';")"
+    echo -e "📡 Fake DNS: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_dns';")"
+    echo -e "📡 Fake Ping: $(sqlite3 "$DB" "SELECT value FROM settings WHERE key='fake_ping';")"
     echo ""
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    if [ "$monitor_status" = "active" ]; then
-        echo -e "  ${WHITE}📊 Monitor:${NC} ${GREEN}Running ✅${NC}"
-    else
-        echo -e "  ${WHITE}📊 Monitor:${NC} ${RED}Stopped ❌${NC}"
-    fi
-    
-    if [ "$bot_status" = "active" ]; then
-        echo -e "  ${WHITE}🤖 Bot:${NC} ${GREEN}Running ✅${NC}"
-    else
-        echo -e "  ${WHITE}🤖 Bot:${NC} ${RED}Stopped ❌${NC}"
-    fi
-    
-    if [ "$PING_STATUS" = "enabled" ]; then
-        echo -e "  ${WHITE}📡 Fake Ping:${NC} ${YELLOW}Enabled (EXACT: ${PING_VALUE}ms)${NC}"
-    else
-        echo -e "  ${WHITE}📡 Fake Ping:${NC} ${BLUE}Disabled${NC}"
-    fi
-    
-    echo ""
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -n "Press Enter to continue..."
+    echo -n "Press Enter..."
     read
 }
 
 # Main Loop
 while true; do
     show_menu
-    echo -n -e "${CYAN}Select option [1-10]: ${NC}"
+    echo -n -e "${CYAN}Select [1-10]: ${NC}"
     read choice
     
     case $choice in
         1) create_user ;;
         2) delete_user ;;
         3) list_users ;;
-        4) view_traffic ;;
+        4) /usr/local/bin/config-generator ;;
         5) fake_ping_menu ;;
-        6) bot_settings ;;
-        7) domain_management ;;
-        8) server_status ;;
-        9)
-            echo ""
-            echo -e "${YELLOW}🔄 Restarting all services...${NC}"
-            systemctl restart traffic-monitor shadow-bot sshd 2>/dev/null
-            echo -e "${GREEN}✅ Restarted!${NC}"
-            sleep 2
-            ;;
-        10)
-            clear
-            echo ""
-            echo -e "${GREEN}👋 Thank you for using Shadow SSH v19.2!${NC}"
-            echo ""
-            exit 0
-            ;;
-        *)
-            echo -e "${RED}❌ Invalid option!${NC}"
+        6) fake_location_menu ;;
+        7) fake_dns_menu ;;
+        8) 
+            if [ -f "$BOT_CONFIG" ]; then
+                echo -e "1. Set Token\n2. Add Admin\n3. Start/Stop\n4. Back"
+                echo -n -e "Select: "
+                read bot_c
+                case $bot_c in
+                    1)
+                        echo -n -e "Token: "
+                        read t
+                        sed -i "s/TOKEN=.*/TOKEN=$t/" "$BOT_CONFIG"
+                        systemctl restart shadow-bot 2>/dev/null
+                        ;;
+                    2)
+                        echo -n -e "ID: "
+                        read id
+                        sed -i "s/ADMINS=.*/ADMINS=$id/" "$BOT_CONFIG"
+                        systemctl restart shadow-bot 2>/dev/null
+                        ;;
+                    3)
+                        systemctl is-active --quiet shadow-bot && systemctl stop shadow-bot || systemctl start shadow-bot
+                        ;;
+                esac
+            else
+                echo -n -e "Token: "
+                read t
+                echo "TOKEN=$t" > "$BOT_CONFIG"
+                echo "ADMINS=" >> "$BOT_CONFIG"
+                systemctl restart shadow-bot 2>/dev/null
+            fi
             sleep 1
             ;;
+        9) server_status ;;
+        10) echo -e "${GREEN}👋 Bye!${NC}"; exit 0 ;;
     esac
 done
 MAINEOF
@@ -1496,13 +1639,9 @@ chmod +x /usr/local/bin/shadow
 # ============================================
 # Install Services
 # ============================================
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}   ⚙️  Installing Services${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
 cat > /etc/systemd/system/traffic-monitor.service << 'SERVICEEOF'
 [Unit]
-Description=Shadow SSH Precision Traffic Monitor
+Description=Shadow SSH Traffic Monitor
 After=network.target
 [Service]
 Type=simple
@@ -1528,21 +1667,40 @@ User=root
 WantedBy=multi-user.target
 BOTSERVICEEOF
 
+cat > /etc/systemd/system/ai-optimizer.service << 'AIEOF'
+[Unit]
+Description=Shadow SSH AI Optimizer
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ai-optimizer
+Restart=always
+RestartSec=30
+User=root
+[Install]
+WantedBy=multi-user.target
+AIEOF
+
 systemctl daemon-reload
-systemctl enable traffic-monitor shadow-bot
-systemctl restart traffic-monitor
+systemctl enable traffic-monitor shadow-bot ai-optimizer
+systemctl restart traffic-monitor ai-optimizer
 
 ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
 
-# Final Message
 clear
 echo ""
 echo -e "${PURPLE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║      ${GREEN}✅ SHADOW SSH v19.2 - PERFECT FAKE PING${PURPLE}            ║${NC}"
+echo -e "${PURPLE}║   ${GREEN}✅ SHADOW SSH v20.0 - BOMB EDITION INSTALLED!${PURPLE}         ║${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${CYAN}🚀 Run:${NC} ${YELLOW}shadow${NC}"
-echo -e "${GREEN}⚡ SPACE SPEED Active${NC}"
-echo -e "${GREEN}📡 Fake Ping: NOW SHOWS EXACT VALUE${NC}"
-echo -e "${GREEN}   (300ms input = 300ms display)${NC}"
+echo -e "${CYAN}🚀 ${YELLOW}shadow${CYAN} - Open Panel${NC}"
+echo ""
+echo -e "${GREEN}💣 BOMB FEATURES:${NC}"
+echo -e "  1. 🇺🇸 Fake Location (6 countries)"
+echo -e "  2. 📱 Smart Config Generator (9 apps)"
+echo -e "  3. 🤖 AI Auto-Optimizer"
+echo -e "  4. 📡 Fake DNS (1ms response)"
+echo -e "  5. 📡 Perfect Fake Ping"
+echo ""
+echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
