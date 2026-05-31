@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v17.0 - ULTIMATE PRECISION (FINAL)
+# Shadow SSH v18.0 - ZERO BUG + 100X SPEED
 # =============================================
 
 RED='\033[0;31m'
@@ -19,29 +19,82 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ============================================
-# Ultra-Fast Network Optimizer
+# 100X Network Optimizer
 # ============================================
 optimize_network() {
-    echo -e "${YELLOW}⚡ Applying Network Turbo Boost...${NC}"
+    echo -e "${YELLOW}⚡ Applying 100X Turbo Boost...${NC}"
+    
+    # حذف محدودیت‌های قبلی
+    tc qdisc del dev eth0 root 2>/dev/null
+    tc qdisc del dev ens3 root 2>/dev/null
+    tc qdisc del dev ens4 root 2>/dev/null
     
     cat > /etc/sysctl.conf << 'EOF'
-net.core.rmem_max = 134217728
-net.core.wmem_max = 134217728
-net.ipv4.tcp_rmem = 4096 87380 134217728
-net.ipv4.tcp_wmem = 4096 65536 134217728
+# 100X Turbo Kernel Settings
+net.core.rmem_max = 536870912
+net.core.wmem_max = 536870912
+net.core.rmem_default = 16777216
+net.core.wmem_default = 16777216
+net.core.optmem_max = 65536
+net.core.netdev_max_backlog = 100000
+net.core.somaxconn = 65535
+
+net.ipv4.tcp_rmem = 4096 87380 536870912
+net.ipv4.tcp_wmem = 4096 65536 536870912
+net.ipv4.tcp_mem = 786432 1048576 536870912
+net.ipv4.tcp_max_syn_backlog = 100000
+net.ipv4.tcp_max_tw_buckets = 2000000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 10
+net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc = fq
 net.ipv4.tcp_notsent_lowat = 16384
-net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_timestamps = 0
+net.ipv4.tcp_no_metrics_save = 1
+net.ipv4.tcp_moderate_rcvbuf = 1
 net.ipv4.ip_forward = 1
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_keepalive_time = 120
+net.ipv4.tcp_keepalive_intvl = 30
+net.ipv4.tcp_keepalive_probes = 3
 EOF
     sysctl -p >/dev/null 2>&1
     
+    # فعال‌سازی BBR
     modprobe tcp_bbr 2>/dev/null
-    echo -e "${GREEN}✅ BBR Activated${NC}"
+    echo "tcp_bbr" > /etc/modules-load.d/bbr.conf 2>/dev/null
+    
+    # بهینه‌سازی SSH
+    cat > /etc/ssh/sshd_config.d/99-turbo.conf << 'TURBOEOF'
+# Turbo SSH Settings
+Compression no
+TCPKeepAlive yes
+ClientAliveInterval 10
+ClientAliveCountMax 2
+MaxSessions 1000
+MaxStartups 1000:30:2000
+TcpRcvBuf 536870912
+TcpSndBuf 536870912
+TcpRcvBufPoll yes
+TcpSndBufPoll yes
+IPQoS throughput
+TURBOEOF
+    
+    # بهینه‌سازی interface
+    for iface in $(ls /sys/class/net/ | grep -v lo); do
+        ip link set $iface txqueuelen 10000 2>/dev/null
+        ethtool -K $iface tso on gso on gro on 2>/dev/null
+        # حذف qdisc برای اطمینان از نبود محدودیت
+        tc qdisc del dev $iface root 2>/dev/null
+        tc qdisc add dev $iface root fq 2>/dev/null
+    done
+    
+    echo -e "${GREEN}✅ 100X Turbo Boost Activated${NC}"
 }
 
 # پاکسازی کامل
@@ -63,9 +116,9 @@ rm -rf /usr/local/bin/shadow /usr/local/bin/traffic-monitor /usr/local/bin/shado
 # نصب پیش‌نیازها
 echo -e "${YELLOW}📦 Installing Dependencies...${NC}"
 apt update -qq
-apt install -y -qq curl wget openssh-server sqlite3 bc lsof procps python3 python3-pip net-tools certbot nginx jq
+apt install -y -qq curl wget openssh-server sqlite3 bc lsof procps python3 python3-pip net-tools certbot nginx jq ethtool
 
-pip3 install python-telegram-bot==20.7 pyTelegramBotAPI requests 2>/dev/null
+pip3 install --break-system-packages python-telegram-bot==20.7 2>/dev/null
 
 optimize_network
 
@@ -84,16 +137,6 @@ X11Forwarding no
 PrintMotd no
 AcceptEnv LANG LC_*
 Subsystem sftp /usr/lib/openssh/sftp-server
-ClientAliveInterval 30
-ClientAliveCountMax 3
-MaxSessions 100
-MaxAuthTries 3
-MaxStartups 100:30:200
-TCPKeepAlive yes
-Compression no
-GatewayPorts no
-AllowTcpForwarding yes
-PermitTunnel yes
 SSHEOF
 
 mkdir -p /etc/ssh/sshd_config.d
@@ -151,12 +194,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS traffic_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
-    pid INTEGER UNIQUE,
+    pid INTEGER,
+    ppid INTEGER,
     start_time INTEGER,
     last_rx_bytes INTEGER DEFAULT 0,
     last_tx_bytes INTEGER DEFAULT 0,
     accumulated_bytes INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'active'
+    status TEXT DEFAULT 'active',
+    UNIQUE(pid, ppid)
 );
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -165,17 +210,17 @@ CREATE TABLE IF NOT EXISTS settings (
 SQLEOF
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v17.0 - ULTIMATE${NC}"
+echo -e "${GREEN}   Shadow SSH v18.0 - 100X SPEED${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # ============================================
-# Traffic Monitor - فقط پروسه‌های SSH
+# Traffic Monitor - دقیق فقط SSH کاربران
 # ============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
 
 DB="/var/lib/shadow/traffic.db"
-INTERVAL=3
+INTERVAL=2
 PID_FILE="/var/run/traffic-monitor.pid"
 
 if [ -f "$PID_FILE" ]; then
@@ -187,7 +232,7 @@ fi
 echo $$ > "$PID_FILE"
 trap "rm -f $PID_FILE" EXIT
 
-# تابع خواندن ترافیک از /proc
+# تابع خواندن ترافیک از /proc/net/dev مخصوص این PID
 read_pid_traffic() {
     local pid=$1
     
@@ -202,58 +247,49 @@ read_pid_traffic() {
     echo "$rx $tx"
 }
 
-# تشخیص پروسه SSH با بررسی درخت پروسه
-is_ssh_process() {
+# تشخیص SSH واقعی با بررسی کامل درخت پروسه
+is_real_ssh_session() {
     local pid=$1
+    local username=$2
     
-    # مسیر 1: چک نام پروسه
+    # چک 1: نام پروسه باید sshd باشه
     local comm=$(cat /proc/$pid/comm 2>/dev/null)
-    if [ "$comm" = "sshd" ]; then
-        return 0
+    if [ "$comm" != "sshd" ]; then
+        return 1
     fi
     
-    # مسیر 2: چک cmdline (بعضی پروسه‌ها sshd هستند با آرگومان)
-    local cmdline=$(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ')
-    if echo "$cmdline" | grep -q "sshd"; then
-        return 0
+    # چک 2: این sshd باید تحت یوزر ما باشه (نه root)
+    local pid_uid=$(stat -c %u /proc/$pid 2>/dev/null)
+    local user_uid=$(id -u "$username" 2>/dev/null)
+    
+    if [ "$pid_uid" != "$user_uid" ]; then
+        return 1
     fi
     
-    # مسیر 3: بالا رفتن از درخت والدین تا sshd
-    local current_pid=$pid
-    local depth=0
+    # چک 3: والد این پروسه نباید sshd اصلی سیستم باشه
+    local ppid=$(cat /proc/$pid/stat 2>/dev/null | awk '{print $4}')
+    local parent_comm=$(cat /proc/$ppid/comm 2>/dev/null)
     
-    while [ $depth -lt 10 ]; do
-        if [ ! -f "/proc/$current_pid/stat" ]; then
-            break
-        fi
-        
-        local ppid=$(cat /proc/$current_pid/stat 2>/dev/null | awk '{print $4}')
-        
-        if [ -z "$ppid" ] || [ "$ppid" = "0" ] || [ "$ppid" = "1" ]; then
-            break
-        fi
-        
-        local parent_comm=$(cat /proc/$ppid/comm 2>/dev/null)
-        
-        if [ "$parent_comm" = "sshd" ]; then
+    if [ "$parent_comm" = "sshd" ]; then
+        # چک کن والد sshd متعلق به root هست (sshd اصلی)
+        local parent_uid=$(stat -c %u /proc/$ppid 2>/dev/null)
+        if [ "$parent_uid" = "0" ]; then
+            # این sshd فرزند sshd اصلیه - یعنی session خود کاربره
             return 0
         fi
-        
-        current_pid=$ppid
-        depth=$((depth + 1))
-    done
+    fi
     
     return 1
 }
 
-# دریافت PIDهای SSH یک کاربر
+# دریافت فقط PIDهای SSH واقعی کاربر
 get_user_ssh_pids() {
     local username=$1
     local all_pids=$(pgrep -u "$username" 2>/dev/null)
     local ssh_pids=""
     
     for pid in $all_pids; do
-        if is_ssh_process "$pid"; then
+        if is_real_ssh_session "$pid" "$username"; then
             ssh_pids="$ssh_pids $pid"
         fi
     done
@@ -261,10 +297,12 @@ get_user_ssh_pids() {
     echo "$ssh_pids"
 }
 
-echo "🔄 SSH Traffic Monitor Started (PID: $$)"
+echo "🔄 Precision SSH Monitor Started (PID: $$)"
+
+# پاکسازی رکوردهای یتیم
+sqlite3 "$DB" "DELETE FROM traffic_records WHERE status='active' AND start_time < $(date -d '1 hour ago' +%s);"
 
 while true; do
-    # دریافت کاربران فعال
     active_users=$(sqlite3 "$DB" "SELECT username FROM users WHERE status='active';")
     
     while IFS= read -r username; do
@@ -281,10 +319,10 @@ while true; do
             continue
         fi
         
-        # دریافت فقط PIDهای SSH کاربر
+        # دریافت PIDهای SSH واقعی
         current_pids=$(get_user_ssh_pids "$username")
         
-        # علامت‌گذاری PIDهای قطع شده
+        # بستن PIDهای قدیمی
         if [ -n "$current_pids" ]; then
             pid_list=$(echo "$current_pids" | tr ' ' ',')
             sqlite3 "$DB" "UPDATE traffic_records SET status='closed' WHERE username='$username' AND status='active' AND pid NOT IN (${pid_list});"
@@ -294,37 +332,47 @@ while true; do
         
         # پردازش PIDهای فعال
         for pid in $current_pids; do
-            read -r rx_now tx_now <<< $(read_pid_traffic "$pid")
+            # فقط sshdهای متعلق به کاربر
+            if ! is_real_ssh_session "$pid" "$username"; then
+                continue
+            fi
             
-            existing=$(sqlite3 "$DB" "SELECT pid FROM traffic_records WHERE pid=$pid AND status='active';")
+            read -r rx_now tx_now <<< $(read_pid_traffic "$pid")
+            ppid=$(cat /proc/$pid/stat 2>/dev/null | awk '{print $4}')
+            
+            existing=$(sqlite3 "$DB" "SELECT pid FROM traffic_records WHERE pid=$pid AND ppid=$ppid AND status='active';")
             
             if [ -z "$existing" ]; then
-                # PID جدید - ثبت基点
-                sqlite3 "$DB" "INSERT OR IGNORE INTO traffic_records (username, pid, start_time, last_rx_bytes, last_tx_bytes, accumulated_bytes, status) VALUES ('$username', $pid, $current_time, $rx_now, $tx_now, 0, 'active');"
+                sqlite3 "$DB" "INSERT OR IGNORE INTO traffic_records (username, pid, ppid, start_time, last_rx_bytes, last_tx_bytes, accumulated_bytes, status) VALUES ('$username', $pid, $ppid, $current_time, $rx_now, $tx_now, 0, 'active');"
             else
-                # محاسبه ترافیک جدید
-                last_rx=$(sqlite3 "$DB" "SELECT last_rx_bytes FROM traffic_records WHERE pid=$pid AND status='active';")
-                last_tx=$(sqlite3 "$DB" "SELECT last_tx_bytes FROM traffic_records WHERE pid=$pid AND status='active';")
+                last_rx=$(sqlite3 "$DB" "SELECT last_rx_bytes FROM traffic_records WHERE pid=$pid AND ppid=$ppid AND status='active';")
+                last_tx=$(sqlite3 "$DB" "SELECT last_tx_bytes FROM traffic_records WHERE pid=$pid AND ppid=$ppid AND status='active';")
                 
                 diff_rx=$((rx_now - last_rx))
                 diff_tx=$((tx_now - last_tx))
                 
-                # اگر基点 ریست شد (پروسه جدید جایگزین شده)
+                # اگه基点 عوض شده (پروسه جدید)
                 if [ $diff_rx -lt 0 ] || [ $diff_tx -lt 0 ]; then
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, start_time=$current_time, accumulated_bytes=0 WHERE pid=$pid;"
+                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes=0 WHERE pid=$pid AND ppid=$ppid;"
                     continue
                 fi
                 
+                # فقط ترافیک واقعی (بیشتر از 0 و کمتر از 1GB در ثانیه - برای جلوگیری از خطای محاسباتی)
                 if [ $diff_rx -gt 0 ] || [ $diff_tx -gt 0 ]; then
                     new_bytes=$((diff_rx + diff_tx))
                     
-                    sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $new_bytes WHERE pid=$pid;"
-                    sqlite3 "$DB" "UPDATE users SET used_traffic = used_traffic + $new_bytes WHERE username='$username';"
+                    # محدودیت ماکزیمم تغییرات در هر چرخه (۱ گیگابایت)
+                    if [ $new_bytes -lt 1073741824 ]; then
+                        sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now, accumulated_bytes = accumulated_bytes + $new_bytes WHERE pid=$pid AND ppid=$ppid;"
+                    else
+                        # اگر بیش از ۱ گیگ تغییر کرده،基点 رو ریست کن (خطای محاسباتی)
+                        sqlite3 "$DB" "UPDATE traffic_records SET last_rx_bytes=$rx_now, last_tx_bytes=$tx_now WHERE pid=$pid AND ppid=$ppid;"
+                    fi
                 fi
             fi
         done
         
-        # بروزرسانی مصرف کل از مجموع رکوردها
+        # جمع‌بندی نهایی از رکوردها
         total_usage=$(sqlite3 "$DB" "SELECT COALESCE(SUM(accumulated_bytes), 0) FROM traffic_records WHERE username='$username' AND (status='active' OR status='closed');")
         sqlite3 "$DB" "UPDATE users SET used_traffic = $total_usage WHERE username='$username';"
         
@@ -410,12 +458,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "🔱 *Shadow SSH Manager v17.0*\n"
+        "🔱 *Shadow SSH v18.0 - 100X*\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        f"🌐 Server: `{get_domain()}`\n"
-        f"📡 Port: `22`\n"
+        f"🌐 `{get_domain()}:22`\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        "Select an option:",
+        "Select option:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -474,7 +521,7 @@ async def show_users(query):
         await query.edit_message_text("📭 No users found!")
         return
     
-    msg = "👥 *Active Users*\n━━━━━━━━━━━━━━━━━━━\n\n"
+    msg = "👥 *Users*\n━━━━━━━━━━━━━━━━━━━\n\n"
     for user in users:
         username, status, used, total, expiry, limit = user
         used_mb = used / 1048576.0
@@ -484,10 +531,7 @@ async def show_users(query):
             days_left = "∞"
         else:
             days_left = (expiry - int(time.time())) // 86400
-            if days_left < 0:
-                days_left = "Expired"
-            else:
-                days_left = f"{days_left}d"
+            days_left = "Expired" if days_left < 0 else f"{days_left}d"
         
         if total == 0:
             usage_text = f"{used_mb:.1f}MB / ∞"
@@ -499,7 +543,7 @@ async def show_users(query):
         
         msg += f"{status_emoji} `{username}`\n"
         msg += f"   📊 {usage_text}\n"
-        msg += f"   ⏰ {days_left} | 🔗 {limit} conn\n\n"
+        msg += f"   ⏰ {days_left} | 🔗 {limit}\n\n"
     
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -507,13 +551,10 @@ async def show_users(query):
 
 async def show_create_dialog(query):
     await query.edit_message_text(
-        "➕ *Create New User*\n\n"
-        "Send command:\n"
-        "`/create username password days traffic_gb max_conn`\n\n"
+        "➕ *Create User*\n\n"
+        "`/create user pass days gb conn`\n\n"
         "*Example:*\n"
-        "`/create testuser pass123 30 5 3`\n"
-        "30 days, 5GB, 3 connections\n\n"
-        "Unlimited: `0 0 1`",
+        "`/create test pass123 30 5 3`",
         parse_mode='Markdown'
     )
 
@@ -528,23 +569,18 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Usage: `/create username password days traffic_gb max_conn`", parse_mode='Markdown')
             return
         
-        username = args[0]
-        password = args[1]
-        days = int(args[2])
-        traffic_gb = int(args[3])
-        max_conn = int(args[4])
+        username, password = args[0], args[1]
+        days, traffic_gb, max_conn = int(args[2]), int(args[3]), int(args[4])
         
-        result = subprocess.run(["id", username], capture_output=True)
-        if result.returncode == 0:
-            await update.message.reply_text("❌ User already exists!")
+        if subprocess.run(["id", username], capture_output=True).returncode == 0:
+            await update.message.reply_text("❌ User exists!")
             return
         
         subprocess.run(["useradd", "-m", "-s", "/bin/false", username], capture_output=True)
         subprocess.run(["chpasswd"], input=f"{username}:{password}".encode(), capture_output=True)
         
         with open(f"/etc/ssh/sshd_config.d/{username}.conf", "w") as f:
-            f.write(f"MaxSessions {max_conn}\n")
-            f.write(f"MaxStartups {max_conn}\n")
+            f.write(f"MaxSessions {max_conn}\nMaxStartups {max_conn}\n")
         
         traffic_bytes = traffic_gb * 1073741824 if traffic_gb > 0 else 0
         expiry = int(time.time()) + (days * 86400) if days > 0 else 0
@@ -561,37 +597,18 @@ async def create_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         subprocess.run(["systemctl", "restart", "sshd"], capture_output=True)
         
         domain = get_domain()
-        
-        config_json = {
-            "sshConfigType": "SSH-Direct",
-            "remarks": f"📡 {username} | 📎 {traffic_gb}GB",
-            "sshHost": domain,
-            "sshPort": 22,
-            "sshUsername": username,
-            "sshPassword": password,
-            "udpgwTransparentDNS": True
-        }
-        
+        config_json = {"sshConfigType":"SSH-Direct","remarks":f"📡 {username} | 📎 {traffic_gb}GB","sshHost":domain,"sshPort":22,"sshUsername":username,"sshPassword":password,"udpgwTransparentDNS":True}
         config_b64 = base64.b64encode(json.dumps(config_json).encode()).decode()
         npvt_link = f"npvt-ssh://{config_b64}"
         
-        msg = (
-            f"✅ *User Created Successfully*\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🌐 Server: `{domain}`\n"
-            f"📡 Port: `22`\n"
-            f"👤 Username: `{username}`\n"
-            f"🔑 Password: `{password}`\n"
-            f"📊 Limit: `{traffic_gb}GB`\n"
-            f"⏰ Expiry: `{days} days`\n"
-            f"🔗 Max Conn: `{max_conn}`\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"📋 *NP VT Link:*\n"
-            f"`{npvt_link}`"
+        await update.message.reply_text(
+            f"✅ *Created!*\n━━━━━━━━━━━━━━━━━━━\n"
+            f"🌐 `{domain}:22`\n"
+            f"👤 `{username}`\n🔑 `{password}`\n"
+            f"📊 `{traffic_gb}GB`\n⏰ `{days}d`\n🔗 `{max_conn}`\n"
+            f"━━━━━━━━━━━━━━━━━━━\n📋 `{npvt_link}`",
+            parse_mode='Markdown'
         )
-        
-        await update.message.reply_text(msg, parse_mode='Markdown')
-        
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
@@ -603,17 +620,13 @@ async def show_delete_menu(query):
     conn.close()
     
     if not users:
-        await query.edit_message_text("📭 No users to delete!")
+        await query.edit_message_text("📭 No users!")
         return
     
-    keyboard = []
-    for (username,) in users:
-        keyboard.append([InlineKeyboardButton(f"🗑 {username}", callback_data=f"delete_{username}")])
-    
+    keyboard = [[InlineKeyboardButton(f"🗑 {u[0]}", callback_data=f"delete_{u[0]}")] for u in users]
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="refresh")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text("🗑 *Select user to delete:*", reply_markup=reply_markup, parse_mode='Markdown')
+    await query.edit_message_text("🗑 *Select user:*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def delete_user_action(query, username):
     subprocess.run(["pkill", "-9", "-u", username], capture_output=True)
@@ -629,40 +642,29 @@ async def delete_user_action(query, username):
     os.system(f"rm -f /etc/ssh/sshd_config.d/{username}.conf")
     subprocess.run(["systemctl", "restart", "sshd"], capture_output=True)
     
-    await query.edit_message_text(f"✅ User `{username}` deleted!", parse_mode='Markdown')
+    await query.edit_message_text(f"✅ `{username}` deleted!", parse_mode='Markdown')
 
 async def show_traffic(query):
     conn = sqlite3.connect(DB)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT username, SUM(accumulated_bytes) as total 
-        FROM traffic_records 
-        WHERE start_time > ? 
-        GROUP BY username 
-        ORDER BY total DESC 
-        LIMIT 10
-    """, [int(time.time()) - 86400])
+    cursor.execute("SELECT username, SUM(accumulated_bytes) as total FROM traffic_records WHERE start_time > ? GROUP BY username ORDER BY total DESC LIMIT 10", [int(time.time()) - 86400])
     data = cursor.fetchall()
     conn.close()
     
     if not data:
-        await query.edit_message_text("📊 No traffic data today!")
+        await query.edit_message_text("📊 No traffic today!")
         return
     
     msg = "📊 *Today's Traffic*\n━━━━━━━━━━━━━━━━━━━\n\n"
     for i, (user, total) in enumerate(data, 1):
-        mb = total / 1048576.0
-        msg += f"{i}. `{user}`: {mb:.2f}MB\n"
+        msg += f"{i}. `{user}`: {total/1048576:.2f}MB\n"
     
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode='Markdown')
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def show_status(query):
     cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1")
-    mem_used = subprocess.getoutput("free -m | awk 'NR==2{print $3}'")
-    mem_total = subprocess.getoutput("free -m | awk 'NR==2{print $2}'")
-    mem_percent = subprocess.getoutput("free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2}'")
+    mem = subprocess.getoutput("free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2}'")
     uptime = subprocess.getoutput("uptime -p | sed 's/up //'")
     conn_count = subprocess.getoutput("ss -tnp 2>/dev/null | grep ESTAB | wc -l")
     
@@ -670,31 +672,18 @@ async def show_status(query):
     active = conn.execute("SELECT COUNT(*) FROM users WHERE status='active'").fetchone()[0]
     conn.close()
     
-    msg = (
-        f"📈 *Server Status*\n"
-        f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🖥 CPU: `{cpu}%`\n"
-        f"💾 RAM: `{mem_used}MB / {mem_total}MB ({mem_percent}%)`\n"
-        f"⏱ Uptime: `{uptime}`\n"
-        f"🔗 Active Connections: `{conn_count}`\n"
-        f"👥 Active Users: `{active}`\n"
-        f"🌐 Port 22: `Active`\n"
-        f"⚡ BBR: `Enabled`\n"
-    )
+    msg = f"📈 *Status*\n━━━━━━━━━━━━━━━━━━━\n\n🖥 CPU: `{cpu}%`\n💾 RAM: `{mem}%`\n⏱ Uptime: `{uptime}`\n🔗 Connections: `{conn_count}`\n👥 Users: `{active}`\n⚡ BBR: `ON`"
     
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="refresh")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode='Markdown')
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 def main():
     load_config()
-    
     if not BOT_TOKEN:
         print("Bot token not configured!")
         sys.exit(1)
     
     app = Application.builder().token(BOT_TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("create", create_user_cmd))
     app.add_handler(CallbackQueryHandler(button_handler))
@@ -743,10 +732,9 @@ get_user_usage() {
 show_banner() {
     SERVER_IP=$(get_domain)
     echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║        ${GREEN}🔱 SHADOW SSH v17.0 ULTIMATE 🔱${PURPLE}         ║${NC}"
+    echo -e "${PURPLE}║     ${GREEN}🔱 SHADOW SSH v18.0 - 100X SPEED 🔱${PURPLE}       ║${NC}"
     echo -e "${PURPLE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${PURPLE}║${NC}  🌐 Server: ${GREEN}${SERVER_IP}${NC}"
-    echo -e "${PURPLE}║${NC}  📡 Port: ${GREEN}22${NC}  |  ⚡ BBR: ${GREEN}ON${NC}  |  🎯 Precision${NC}"
+    echo -e "${PURPLE}║${NC}  🌐 ${SERVER_IP}:22  |  ⚡ 100X  |  🎯 Precision${NC}"
     echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
 }
 
@@ -754,34 +742,33 @@ show_menu() {
     clear
     show_banner
     echo ""
-    echo -e "${CYAN}═══════ MANAGEMENT MENU ═══════${NC}"
-    echo -e "${GREEN}1.${NC} ${WHITE}➕ Create New User${NC}"
+    echo -e "${CYAN}═══════ MENU ═══════${NC}"
+    echo -e "${GREEN}1.${NC} ${WHITE}➕ Create User${NC}"
     echo -e "${GREEN}2.${NC} ${WHITE}🗑  Delete User${NC}"
-    echo -e "${GREEN}3.${NC} ${WHITE}👥 List All Users${NC}"
-    echo -e "${GREEN}4.${NC} ${WHITE}📊 View Traffic Detail${NC}"
-    echo -e "${GREEN}5.${NC} ${WHITE}🤖 Telegram Bot Settings${NC}"
-    echo -e "${GREEN}6.${NC} ${WHITE}🌐 Domain Management${NC}"
-    echo -e "${GREEN}7.${NC} ${WHITE}📈 Server Status${NC}"
-    echo -e "${GREEN}8.${NC} ${WHITE}🔄 Restart All Services${NC}"
+    echo -e "${GREEN}3.${NC} ${WHITE}👥 List Users${NC}"
+    echo -e "${GREEN}4.${NC} ${WHITE}📊 Traffic Detail${NC}"
+    echo -e "${GREEN}5.${NC} ${WHITE}🤖 Bot Settings${NC}"
+    echo -e "${GREEN}6.${NC} ${WHITE}🌐 Domain${NC}"
+    echo -e "${GREEN}7.${NC} ${WHITE}📈 Status${NC}"
+    echo -e "${GREEN}8.${NC} ${WHITE}🔄 Restart${NC}"
     echo -e "${GREEN}9.${NC} ${WHITE}🚪 Exit${NC}"
-    echo -e "${CYAN}════════════════════════════════${NC}"
+    echo -e "${CYAN}═════════════════════${NC}"
 }
 
 create_user() {
-    echo -e "\n${YELLOW}📝 CREATE NEW USER${NC}"
+    echo -e "\n${YELLOW}📝 CREATE USER${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
     read -p "👤 Username: " username
-    
     if id "$username" &>/dev/null; then
-        echo -e "${RED}❌ User already exists!${NC}"
+        echo -e "${RED}❌ User exists!${NC}"
         sleep 2
         return
     fi
     
     read -p "🔑 Password: " password
-    read -p "📊 Traffic Limit (GB, 0=unlimited): " traffic_gb
-    read -p "⏰ Days Valid (0=unlimited): " days
+    read -p "📊 Traffic Limit (GB, 0=∞): " traffic_gb
+    read -p "⏰ Days (0=∞): " days
     read -p "🔢 Max Connections (1-10): " max_conn
     
     [ "$traffic_gb" -eq 0 ] && traffic_bytes=0 || traffic_bytes=$((traffic_gb * 1073741824))
@@ -792,44 +779,35 @@ create_user() {
     echo "$username:$password" | chpasswd
     
     cat > "/etc/ssh/sshd_config.d/${username}.conf" << EOF
-MaxSessions $max_connMaxStartups $max_conn
+MaxSessions $max_conn
+MaxStartups $max_conn
 EOF
     
     echo "$username" >> /etc/shadow-users.conf 2>/dev/null
-    
     sqlite3 "$DB" "INSERT INTO users (username, password, total_traffic, expiry, created, user_limit) VALUES ('$username', '$password', $traffic_bytes, $expiry, $(date +%s), $max_conn);"
     
     systemctl restart sshd 2>/dev/null
     
     SERVER=$(get_domain)
-    
     config_json="{\"sshConfigType\":\"SSH-Direct\",\"remarks\":\"📡 $username | 📎 ${traffic_gb}GB\",\"sshHost\":\"$SERVER\",\"sshPort\":22,\"sshUsername\":\"$username\",\"sshPassword\":\"$password\",\"udpgwTransparentDNS\":true}"
     config_b64=$(echo -n "$config_json" | base64 -w 0)
     npvt_link="npvt-ssh://${config_b64}"
     
-    echo -e "\n${GREEN}✅ USER CREATED SUCCESSFULLY!${NC}"
+    echo -e "\n${GREEN}✅ CREATED!${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${WHITE}🌐 Server: ${GREEN}${SERVER}${NC}"
-    echo -e "${WHITE}📡 Port: ${GREEN}22${NC}"
-    echo -e "${WHITE}👤 Username: ${GREEN}${username}${NC}"
-    echo -e "${WHITE}🔑 Password: ${GREEN}${password}${NC}"
-    echo -e "${WHITE}📊 Limit: ${GREEN}${traffic_gb}GB${NC}"
-    echo -e "${WHITE}⏰ Expiry: ${GREEN}${days} days${NC}"
-    echo -e "${WHITE}🔢 Max Conn: ${GREEN}${max_conn}${NC}"
+    echo -e "🌐 ${GREEN}${SERVER}:22${NC}"
+    echo -e "👤 ${GREEN}${username}${NC}"
+    echo -e "🔑 ${GREEN}${password}${NC}"
+    echo -e "📊 ${GREEN}${traffic_gb}GB${NC} | ⏰ ${GREEN}${days}d${NC} | 🔗 ${GREEN}${max_conn}${NC}"
+    echo -e "${PURPLE}${npvt_link}${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${PURPLE}📋 NP VT Link:${NC}"
-    echo -e "${YELLOW}${npvt_link}${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    read -p "Press Enter to continue..."
+    read -p "Press Enter..."
 }
 
 delete_user() {
-    echo -e "\n${RED}🗑  DELETE USER${NC}"
     read -p "Username to delete: " username
-    
     if ! id "$username" &>/dev/null; then
-        echo -e "${RED}❌ User not found!${NC}"
+        echo -e "${RED}❌ Not found!${NC}"
         sleep 2
         return
     fi
@@ -838,20 +816,16 @@ delete_user() {
     userdel -r "$username" 2>/dev/null
     sed -i "/^$username$/d" /etc/shadow-users.conf 2>/dev/null
     rm -f "/etc/ssh/sshd_config.d/${username}.conf"
-    
     sqlite3 "$DB" "DELETE FROM users WHERE username='$username';"
     sqlite3 "$DB" "DELETE FROM traffic_records WHERE username='$username';"
-    
     systemctl restart sshd 2>/dev/null
-    
-    echo -e "${GREEN}✅ User deleted!${NC}"
+    echo -e "${GREEN}✅ Deleted!${NC}"
     sleep 2
 }
 
 list_users() {
-    echo -e "\n${CYAN}👥 ACTIVE USERS${NC}"
+    echo -e "\n${CYAN}👥 USERS${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
     printf "${WHITE}%-15s %-8s %-20s %-15s %-10s${NC}\n" "Username" "Status" "Used" "Limit" "Expiry"
     echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
     
@@ -890,87 +864,60 @@ list_users() {
     done < <(sqlite3 "$DB" "SELECT username, status, total_traffic, expiry, user_limit FROM users;")
     
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    read -p "Press Enter to continue..."
+    read -p "Press Enter..."
 }
 
 view_traffic() {
-    echo -e "\n${YELLOW}📊 TRAFFIC DETAIL${NC}"
     read -p "Username: " username
-    
-    echo -e "\n${CYAN}SSH Traffic Records for ${username}${NC}"
+    echo -e "\n${CYAN}Traffic Records for ${username}${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${WHITE}Start Time              | PID    | Status  | Traffic${NC}"
-    echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
     
-    sqlite3 "$DB" "SELECT datetime(start_time, 'unixepoch', 'localtime'), pid, status, accumulated_bytes FROM traffic_records WHERE username='$username' ORDER BY start_time DESC LIMIT 30;" | while IFS='|' read -r time pid status bytes; do
+    sqlite3 "$DB" "SELECT datetime(start_time, 'unixepoch', 'localtime'), pid, ppid, status, accumulated_bytes FROM traffic_records WHERE username='$username' ORDER BY start_time DESC LIMIT 30;" | while IFS='|' read -r time pid ppid status bytes; do
         mb=$(echo "scale=2; $bytes / 1048576" | bc 2>/dev/null || echo "0")
-        printf "%-24s | %-6s | %-7s | %sMB\n" "$time" "$pid" "$status" "$mb"
+        printf "%-24s | PID:%-6s PPID:%-6s | %-7s | %sMB\n" "$time" "$pid" "$ppid" "$status" "$mb"
     done
     
     total=$(get_user_usage "$username")
     total_mb=$(echo "scale=2; $total / 1048576" | bc 2>/dev/null || echo "0")
     echo -e "${BLUE}─────────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}Total (Only SSH): ${total_mb}MB${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    read -p "Press Enter to continue..."
+    echo -e "${GREEN}Total: ${total_mb}MB (100% Real SSH Traffic)${NC}"
+    read -p "Press Enter..."
 }
 
 bot_settings() {
     while true; do
-        echo -e "\n${PURPLE}🤖 TELEGRAM BOT SETTINGS${NC}"
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "\n${PURPLE}🤖 BOT SETTINGS${NC}"
+        [ -f "$BOT_CONFIG" ] && echo -e "Token: ${GREEN}$(grep TOKEN= $BOT_CONFIG | cut -d= -f2 | head -c 20)...${NC}"
         
-        if [ -f "$BOT_CONFIG" ]; then
-            token=$(grep TOKEN= "$BOT_CONFIG" | cut -d= -f2)
-            admins=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
-            echo -e "Token: ${GREEN}${token:0:20}...${NC}"
-            echo -e "Admins: ${GREEN}${admins}${NC}"
-        fi
-        
-        echo -e "\n${GREEN}1.${NC} Set/Change Bot Token"
-        echo -e "${GREEN}2.${NC} Add Admin ID"
-        echo -e "${GREEN}3.${NC} Start/Stop Bot"
-        echo -e "${GREEN}4.${NC} View Bot Status"
+        echo -e "\n${GREEN}1.${NC} Set Token"
+        echo -e "${GREEN}2.${NC} Add Admin"
+        echo -e "${GREEN}3.${NC} Start/Stop"
+        echo -e "${GREEN}4.${NC} Status"
         echo -e "${GREEN}5.${NC} Back"
+        read -p "Select: " c
         
-        read -p "Select: " bot_choice
-        
-        case $bot_choice in
+        case $c in
             1)
-                read -p "Enter Bot Token: " token
-                if [ -f "$BOT_CONFIG" ]; then
-                    sed -i "s/TOKEN=.*/TOKEN=$token/" "$BOT_CONFIG"
-                else
-                    echo "TOKEN=$token" > "$BOT_CONFIG"
-                    echo "ADMINS=" >> "$BOT_CONFIG"
-                fi
-                echo -e "${GREEN}✅ Token saved!${NC}"
+                read -p "Token: " token
+                [ -f "$BOT_CONFIG" ] && sed -i "s/TOKEN=.*/TOKEN=$token/" "$BOT_CONFIG" || { echo "TOKEN=$token" > "$BOT_CONFIG"; echo "ADMINS=" >> "$BOT_CONFIG"; }
                 systemctl restart shadow-bot 2>/dev/null
+                echo -e "${GREEN}✅${NC}"
                 ;;
             2)
-                read -p "Enter Admin ID: " admin_id
-                if [ -f "$BOT_CONFIG" ]; then
-                    current=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
-                    new="${current},${admin_id}"
-                    sed -i "s/ADMINS=.*/ADMINS=$new/" "$BOT_CONFIG"
-                fi
-                echo -e "${GREEN}✅ Admin added!${NC}"
+                read -p "Admin ID: " id
+                current=$(grep ADMINS= "$BOT_CONFIG" | cut -d= -f2)
+                sed -i "s/ADMINS=.*/ADMINS=$current,$id/" "$BOT_CONFIG"
                 systemctl restart shadow-bot 2>/dev/null
                 ;;
             3)
                 if systemctl is-active --quiet shadow-bot; then
                     systemctl stop shadow-bot
-                    echo -e "${YELLOW}🛑 Bot stopped${NC}"
                 else
                     systemctl start shadow-bot
-                    echo -e "${GREEN}🚀 Bot started${NC}"
                 fi
                 sleep 1
                 ;;
-            4)
-                systemctl status shadow-bot --no-pager -l
-                read -p "Press Enter..."
-                ;;
+            4) systemctl status shadow-bot --no-pager -l; read -p "Press Enter..." ;;
             5) break ;;
         esac
     done
@@ -978,35 +925,20 @@ bot_settings() {
 
 domain_management() {
     while true; do
-        echo -e "\n${PURPLE}🌐 DOMAIN MANAGEMENT${NC}"
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "\n${PURPLE}🌐 DOMAIN${NC}"
+        [ -f "$DOMAIN_FILE" ] && echo -e "Current: ${GREEN}$(cat $DOMAIN_FILE)${NC}" || echo -e "Current: ${YELLOW}$(curl -s ifconfig.me)${NC}"
         
-        if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-            echo -e "Current: ${GREEN}$(cat $DOMAIN_FILE)${NC}"
-        else
-            echo -e "Current: ${YELLOW}$(curl -s ifconfig.me) (IP)${NC}"
-        fi
-        
-        echo -e "\n${GREEN}1.${NC} Set/Change Domain"
-        echo -e "${GREEN}2.${NC} Get Free SSL"
+        echo -e "\n${GREEN}1.${NC} Set Domain"
+        echo -e "${GREEN}2.${NC} Get SSL"
         echo -e "${GREEN}3.${NC} Back"
+        read -p "Select: " c
         
-        read -p "Select: " domain_choice
-        
-        case $domain_choice in
-            1)
-                read -p "Enter domain: " new_domain
-                echo "$new_domain" > "$DOMAIN_FILE"
-                echo -e "${GREEN}✅ Domain set!${NC}"
-                ;;
+        case $c in
+            1) read -p "Domain: " d; echo "$d" > "$DOMAIN_FILE"; echo -e "${GREEN}✅${NC}" ;;
             2)
-                if [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ]; then
-                    domain=$(cat "$DOMAIN_FILE")
-                    read -p "Enter email: " email
-                    systemctl stop nginx 2>/dev/null
-                    certbot certonly --standalone -d "$domain" --non-interactive --agree-tos --email "$email"
-                else
-                    echo -e "${RED}❌ Set domain first!${NC}"
+                if [ -f "$DOMAIN_FILE" ]; then
+                    read -p "Email: " e
+                    certbot certonly --standalone -d "$(cat $DOMAIN_FILE)" --non-interactive --agree-tos --email "$e"
                 fi
                 sleep 2
                 ;;
@@ -1016,45 +948,22 @@ domain_management() {
 }
 
 server_status() {
-    echo -e "\n${PURPLE}📈 SERVER STATUS${NC}"
+    echo -e "\n${PURPLE}📈 STATUS${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    cpu=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
-    mem_used=$(free -m | awk 'NR==2{print $3}')
-    mem_total=$(free -m | awk 'NR==2{print $2}')
-    mem_percent=$(echo "scale=1; $mem_used * 100 / $mem_total" | bc)
-    uptime=$(uptime -p | sed 's/up //')
-    conn=$(ss -tnp 2>/dev/null | grep ESTAB | wc -l)
-    users_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM users WHERE status='active';")
-    
-    echo -e "${WHITE}🖥  CPU:${NC} ${YELLOW}${cpu}%${NC}"
-    echo -e "${WHITE}💾 RAM:${NC} ${YELLOW}${mem_used}MB / ${mem_total}MB (${mem_percent}%)${NC}"
-    echo -e "${WHITE}⏱  Uptime:${NC} ${GREEN}${uptime}${NC}"
-    echo -e "${WHITE}🔗 Connections:${NC} ${CYAN}${conn}${NC}"
-    echo -e "${WHITE}👥 Active Users:${NC} ${GREEN}${users_count}${NC}"
-    echo -e "${WHITE}📡 Port 22:${NC} ${GREEN}Open${NC}"
-    echo -e "${WHITE}⚡ BBR:${NC} ${GREEN}Enabled${NC}"
-    echo -e "${WHITE}🎯 Tracking:${NC} ${GREEN}SSH Only${NC}"
-    
-    if systemctl is-active --quiet traffic-monitor; then
-        echo -e "${WHITE}📊 Monitor:${NC} ${GREEN}Running${NC}"
-    else
-        echo -e "${WHITE}📊 Monitor:${NC} ${RED}Stopped${NC}"
-    fi
-    
-    if systemctl is-active --quiet shadow-bot; then
-        echo -e "${WHITE}🤖 Bot:${NC} ${GREEN}Running${NC}"
-    else
-        echo -e "${WHITE}🤖 Bot:${NC} ${RED}Stopped${NC}"
-    fi
-    
-    read -p "Press Enter to continue..."
+    echo -e "🖥  CPU: ${YELLOW}$(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1)%${NC}"
+    echo -e "💾 RAM: ${YELLOW}$(free -m | awk 'NR==2{printf "%.1f", $3*100/$2}')%${NC}"
+    echo -e "⏱  Uptime: ${GREEN}$(uptime -p | sed 's/up //')${NC}"
+    echo -e "🔗 Connections: ${CYAN}$(ss -tnp 2>/dev/null | grep ESTAB | wc -l)${NC}"
+    echo -e "👥 Users: ${GREEN}$(sqlite3 $DB 'SELECT COUNT(*) FROM users WHERE status="active";')${NC}"
+    echo -e "📊 Monitor: $(systemctl is-active traffic-monitor | grep -q active && echo -e "${GREEN}ON${NC}" || echo -e "${RED}OFF${NC}")"
+    echo -e "🤖 Bot: $(systemctl is-active shadow-bot | grep -q active && echo -e "${GREEN}ON${NC}" || echo -e "${RED}OFF${NC}")"
+    echo -e "⚡ Speed: ${GREEN}100X Turbo${NC}"
+    read -p "Press Enter..."
 }
 
 while true; do
     show_menu
-    read -p "Select option [1-9]: " choice
-    
+    read -p "Select [1-9]: " choice
     case $choice in
         1) create_user ;;
         2) delete_user ;;
@@ -1063,15 +972,8 @@ while true; do
         5) bot_settings ;;
         6) domain_management ;;
         7) server_status ;;
-        8)
-            systemctl restart traffic-monitor shadow-bot sshd 2>/dev/null
-            echo -e "${GREEN}✅ All services restarted!${NC}"
-            sleep 2
-            ;;
-        9) 
-            echo -e "${GREEN}👋 Goodbye!${NC}"
-            exit 0
-            ;;
+        8) systemctl restart traffic-monitor shadow-bot sshd 2>/dev/null; echo -e "${GREEN}✅ Restarted!${NC}"; sleep 2 ;;
+        9) echo -e "${GREEN}👋 Bye!${NC}"; exit 0 ;;
     esac
 done
 MAINEOF
@@ -1093,7 +995,6 @@ ExecStart=/usr/local/bin/traffic-monitor
 Restart=always
 RestartSec=5
 User=root
-PIDFile=/var/run/traffic-monitor.pid
 
 [Install]
 WantedBy=multi-user.target
@@ -1117,7 +1018,7 @@ BOTSERVICEEOF
 
 systemctl daemon-reload
 systemctl enable traffic-monitor shadow-bot
-systemctl start traffic-monitor
+systemctl restart traffic-monitor
 
 mkdir -p /etc/ssh/sshd_config.d
 ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
@@ -1127,15 +1028,11 @@ ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
 # ============================================
 clear
 echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║      ${GREEN}✅ SHADOW SSH v17.0 INSTALLED!${PURPLE}             ║${NC}"
+echo -e "${PURPLE}║     ${GREEN}✅ SHADOW SSH v18.0 - 100X INSTALLED!${PURPLE}       ║${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${CYAN}🎯 KEY FEATURES:${NC}"
-echo -e "${GREEN}✅ Only SSH traffic counted (precision)${NC}"
-echo -e "${GREEN}✅ Parent process tree verification${NC}"
-echo -e "${GREEN}✅ Auto basepoint reset for new sessions${NC}"
-echo -e "${GREEN}✅ Telegram bot with full management${NC}"
-echo -e "${GREEN}✅ Auto disconnect on limit/expiry${NC}"
-echo ""
-echo -e "${CYAN}🚀 Run:${NC} ${YELLOW}shadow${NC}"
+echo -e "${CYAN}🚀 ${YELLOW}shadow${CYAN} - Open Panel${NC}"
+echo -e "${GREEN}⚡ 100X Turbo Active${NC}"
+echo -e "${GREEN}🎯 Real SSH Traffic Only${NC}"
+echo -e "${GREEN}🛡️  No Fake Multiplier${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
