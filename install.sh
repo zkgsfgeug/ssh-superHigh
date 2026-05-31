@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v27.0 - TRUE PRECISION (iptables)
+# Shadow SSH v27.1 - IPv4 ONLY PRECISION
+# Fixed: Only count IPv4 traffic, ignore IPv6
 # =============================================
 
 RED='\033[0;31m'
@@ -19,13 +20,24 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ============================================
-# Network Optimizer
+# Network Optimizer - IPv4 ONLY
 # ============================================
 optimize_network() {
-    echo -e "${YELLOW}🚀 Activating PRECISION Network${NC}"
+    echo -e "${YELLOW}🚀 Activating PRECISION Network (IPv4 Only)${NC}"
+    
+    # Disable IPv6 completely
+    cat >> /etc/sysctl.conf << 'EOF'
+# Disable IPv6
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+EOF
+    sysctl -p >/dev/null 2>&1
     
     for iface in $(ls /sys/class/net/ | grep -v lo); do
         tc qdisc del dev $iface root 2>/dev/null
+        # Disable IPv6 on interface
+        sysctl -w net.ipv6.conf.$iface.disable_ipv6=1 2>/dev/null
     done
     
     cat > /etc/sysctl.conf << 'EOF'
@@ -36,10 +48,14 @@ net.core.default_qdisc = fq
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.ip_forward = 1
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
     sysctl -p >/dev/null 2>&1
     modprobe tcp_bbr 2>/dev/null
     
+    # SSH - Listen on IPv4 only
     cat > /etc/ssh/sshd_config.d/99-precision.conf << 'TURBOEOF'
 Compression no
 TCPKeepAlive yes
@@ -47,6 +63,7 @@ ClientAliveInterval 10
 ClientAliveCountMax 2
 MaxSessions 10000
 MaxStartups 10000:30:20000
+AddressFamily inet
 TURBOEOF
     
     for iface in $(ls /sys/class/net/ | grep -v lo); do
@@ -55,7 +72,7 @@ TURBOEOF
         tc qdisc add dev $iface root fq maxrate 100gbit 2>/dev/null
     done
     
-    echo -e "${GREEN}✅ Network Activated${NC}"
+    echo -e "${GREEN}✅ Network Activated (IPv4 Only)${NC}"
 }
 
 # ============================================
@@ -74,6 +91,8 @@ pkill -9 -f "fake-location" 2>/dev/null
 
 iptables -t mangle -F 2>/dev/null
 iptables -t nat -F 2>/dev/null
+ip6tables -t mangle -F 2>/dev/null
+ip6tables -t nat -F 2>/dev/null
 tc qdisc del dev eth0 root 2>/dev/null
 tc qdisc del dev lo root 2>/dev/null
 
@@ -96,7 +115,7 @@ pip3 install --break-system-packages python-telegram-bot==20.7 2>/dev/null
 
 optimize_network
 
-# SSH Config
+# SSH Config - Force IPv4 only
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup 2>/dev/null
 cat > /etc/ssh/sshd_config << 'SSHEOF'
 Port 22
@@ -109,6 +128,7 @@ X11Forwarding no
 PrintMotd no
 AcceptEnv LANG LC_*
 Subsystem sftp /usr/lib/openssh/sftp-server
+AddressFamily inet
 SSHEOF
 
 mkdir -p /etc/ssh/sshd_config.d
@@ -175,17 +195,17 @@ INSERT OR IGNORE INTO settings VALUES ('next_mark', '100');
 SQLEOF
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v27.0 - TRUE PRECISION${NC}"
+echo -e "${GREEN}   Shadow SSH v27.1 - IPv4 ONLY${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # ============================================
-# TRAFFIC MONITOR - iptables BASED (No PID)
+# TRAFFIC MONITOR - iptables IPv4 ONLY
 # ============================================
 cat > /usr/local/bin/traffic-monitor << 'MONITOREOF'
 #!/bin/bash
 # ============================================
-# TRUE PRECISION - iptables byte counting
-# No PID deltas. No duplication. 1:1 accuracy.
+# TRUE PRECISION - IPv4 ONLY
+# iptables byte counting (iptables, NOT ip6tables)
 # ============================================
 
 DB="/var/lib/shadow/traffic.db"
@@ -196,15 +216,20 @@ PID_FILE="/var/run/traffic-monitor.pid"
 echo $$ > "$PID_FILE"
 trap "rm -f $PID_FILE" EXIT
 
-# Initialize iptables rules for all users
+# Initialize iptables rules for all users (IPv4 only)
 init_user_rules() {
     local username=$1
     local mark=$2
     
-    # Only add if not exists
+    # IPv4 OUTPUT
     iptables -t mangle -C OUTPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
     if [ $? -ne 0 ]; then
         iptables -t mangle -A OUTPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
+    fi
+    
+    # IPv4 INPUT
+    iptables -t mangle -C INPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
+    if [ $? -ne 0 ]; then
         iptables -t mangle -A INPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
     fi
 }
@@ -212,14 +237,14 @@ init_user_rules() {
 get_iptables_bytes() {
     local mark=$1
     
-    # Get bytes from iptables counters
+    # ONLY read from iptables (IPv4) - NEVER from ip6tables
     local out_bytes=$(iptables -t mangle -L OUTPUT -v -n -x 2>/dev/null | grep "MARK set 0x$(printf '%x' $mark)" | awk '{print $2}')
     local in_bytes=$(iptables -t mangle -L INPUT -v -n -x 2>/dev/null | grep "MARK set 0x$(printf '%x' $mark)" | awk '{print $2}')
     
     echo "${out_bytes:-0} ${in_bytes:-0}"
 }
 
-echo "🎯 TRUE PRECISION Monitor (iptables) Started - PID: $$"
+echo "🎯 TRUE PRECISION Monitor (IPv4 Only) Started - PID: $$"
 
 # Initialize all active users
 while IFS='|' read -r username mark; do
@@ -231,7 +256,6 @@ done < <(sqlite3 "$DB" "SELECT username, iptables_mark FROM users WHERE status='
 while true; do
     current_time=$(date +%s)
     
-    # Read all active users with marks
     while IFS='|' read -r username total_limit expiry mark; do
         [ -z "$username" ] && continue
         
@@ -247,15 +271,13 @@ while true; do
         # Ensure rules exist
         init_user_rules "$username" "$mark"
         
-        # ============================================
-        # THE ONLY CORRECT WAY: Read iptables counters
-        # ============================================
+        # Read IPv4 ONLY counters
         read -r out_bytes in_bytes <<< $(get_iptables_bytes "$mark")
         
-        # Total traffic in bytes (absolute, not delta)
+        # Total IPv4 traffic in bytes
         total_bytes=$((out_bytes + in_bytes))
         
-        # DIRECTLY SET used_traffic (not ADD)
+        # DIRECTLY SET used_traffic (IPv4 only)
         sqlite3 "$DB" "UPDATE users SET used_traffic = $total_bytes WHERE username='$username';"
         
         # Check limit
@@ -470,7 +492,7 @@ def get_domain():
         with open(DOMAIN_FILE) as f:
             d = f.read().strip()
             if d: return d
-    return subprocess.getoutput("curl -s ifconfig.me")
+    return subprocess.getoutput("curl -s4 ifconfig.me")
 
 def gen_nap(server, user, pwd, days="∞", gb="∞"):
     remarks = f"📡 {user}"
@@ -492,7 +514,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
           [InlineKeyboardButton("🗑 Delete", callback_data="del_menu")],
           [InlineKeyboardButton("📦 Backup", callback_data="backup")],
           [InlineKeyboardButton("📈 Status", callback_data="status")]]
-    await update.message.reply_text(f"🔱 *Shadow v27.0*\n🌐 `{get_domain()}:22`", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
+    await update.message.reply_text(f"🔱 *Shadow v27.1*\n🌐 `{get_domain()}:22`\n🎯 IPv4 Only", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
 
 async def btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -543,6 +565,7 @@ async def btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.system(f"rm -f /etc/ssh/sshd_config.d/{name}.conf")
         mark=$(sqlite3 "$DB" "SELECT iptables_mark FROM users WHERE username='$name';")
         [ -n "$mark" ] && iptables -t mangle -D OUTPUT -m owner --uid-owner "$name" -j MARK --set-mark "$mark" 2>/dev/null
+        [ -n "$mark" ] && iptables -t mangle -D INPUT -m owner --uid-owner "$name" -j MARK --set-mark "$mark" 2>/dev/null
         subprocess.run(["systemctl","restart","sshd"])
         await q.edit_message_text(f"✅ `{name}` deleted!", parse_mode='Markdown')
     
@@ -556,7 +579,7 @@ async def btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         up = subprocess.getoutput("uptime -p|sed 's/up //'")
         conn = subprocess.getoutput("ss -tnp|grep ESTAB|wc -l")
         act = sqlite3.connect(DB).execute("SELECT COUNT(*) FROM users WHERE status='active'").fetchone()[0]
-        msg = f"📈 *Status*\n🖥 CPU: `{cpu}%`\n💾 RAM: `{mem}%`\n⏱ `{up}`\n🔗 `{conn}`\n👥 `{act}`"
+        msg = f"📈 *Status*\n🖥 CPU: `{cpu}%`\n💾 RAM: `{mem}%`\n⏱ `{up}`\n🔗 `{conn}`\n👥 `{act}`\n🎯 IPv4 Only"
         await q.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙", callback_data="back")]]), parse_mode='Markdown')
     
     elif q.data == "back":
@@ -565,7 +588,7 @@ async def btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
               [InlineKeyboardButton("🗑 Delete", callback_data="del_menu")],
               [InlineKeyboardButton("📦 Backup", callback_data="backup")],
               [InlineKeyboardButton("📈 Status", callback_data="status")]]
-        await q.edit_message_text(f"🔱 *Shadow v27.0*\n🌐 `{get_domain()}:22`", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
+        await q.edit_message_text(f"🔱 *Shadow v27.1*\n🌐 `{get_domain()}:22`\n🎯 IPv4 Only", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
 
 async def create_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id): await update.message.reply_text("❌"); return
@@ -586,7 +609,6 @@ async def create_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tb = gb*1073741824 if gb>0 else 0
         exp = int(time.time())+(days*86400) if days>0 else 0
         
-        # Get unique iptables mark
         next_mark=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='next_mark';")
         mark=${next_mark:-100}
         sqlite3 "$DB" "UPDATE settings SET value=$(($mark+1)) WHERE key='next_mark';"
@@ -597,7 +619,7 @@ async def create_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn_db.commit()
         conn_db.close()
         
-        # Setup iptables rules
+        # IPv4 only iptables rules
         iptables -t mangle -A OUTPUT -m owner --uid-owner "$name" -j MARK --set-mark "$mark" 2>/dev/null
         iptables -t mangle -A INPUT -m owner --uid-owner "$name" -j MARK --set-mark "$mark" 2>/dev/null
         
@@ -608,7 +630,7 @@ async def create_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         link = gen_nap(domain, name, pwd, str(days) if days>0 else "∞", str(gb) if gb>0 else "∞")
         
         await update.message.reply_text(
-            f"✅ *Created!*\n🌐 `{domain}:22`\n👤 `{name}`\n🔑 `{pwd}`\n📊 `{gb}GB`\n⏰ `{days}d`\n🔗 `{conn}`\n\n📋 `{link}`",
+            f"✅ *Created!*\n🌐 `{domain}:22`\n👤 `{name}`\n🔑 `{pwd}`\n📊 `{gb}GB`\n⏰ `{days}d`\n🔗 `{conn}`\n🎯 IPv4 Only\n\n📋 `{link}`",
             parse_mode='Markdown'
         )
     except Exception as e:
@@ -649,13 +671,14 @@ PURPLE='\033[0;35m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-get_domain() { [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ] && cat "$DOMAIN_FILE" || curl -s ifconfig.me; }
+# Force IPv4 for all curl calls
+get_domain() { [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ] && cat "$DOMAIN_FILE" || curl -s4 ifconfig.me; }
 
 show_banner() {
     SERVER_IP=$(get_domain)
     echo ""
     echo -e "${PURPLE}╔════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║  ${GREEN}🔱 SHADOW SSH v27.0 - TRUE PRECISION${PURPLE}   ║${NC}"
+    echo -e "${PURPLE}║  ${GREEN}🔱 SHADOW SSH v27.1 - IPv4 ONLY${PURPLE}        ║${NC}"
     echo -e "${PURPLE}║  🌐 ${SERVER_IP}:22  |  🎯 iptables 1:1${PURPLE}       ║${NC}"
     echo -e "${PURPLE}╚════════════════════════════════════════════╝${NC}"
     echo ""
@@ -706,12 +729,11 @@ MaxSessions $max_conn
 MaxStartups $max_conn
 EOF
     
-    # Get unique iptables mark
     next_mark=$(sqlite3 "$DB" "SELECT value FROM settings WHERE key='next_mark';")
     mark=${next_mark:-100}
     sqlite3 "$DB" "UPDATE settings SET value=$(($mark+1)) WHERE key='next_mark';"
     
-    # Setup iptables rules for this user
+    # IPv4 only
     iptables -t mangle -A OUTPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
     iptables -t mangle -A INPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
     
@@ -737,6 +759,7 @@ EOF
     echo -e "  👤 ${GREEN}${username}${NC}"
     echo -e "  🔑 ${GREEN}${password}${NC}"
     echo -e "  📊 ${GREEN}${traffic_gb}GB${NC} | ⏰ ${GREEN}${days}d${NC} | 🔗 ${GREEN}${max_conn}${NC}"
+    echo -e "  🎯 IPv4 Only"
     echo ""
     echo -e "${PURPLE}📋 ${YELLOW}${npvt_link}${NC}"
     echo ""
@@ -751,7 +774,6 @@ delete_user() {
     echo -n -e "Are you sure? (y/n): "; read confirm
     [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && return
     
-    # Remove iptables rules
     mark=$(sqlite3 "$DB" "SELECT iptables_mark FROM users WHERE username='$username';")
     iptables -t mangle -D OUTPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
     iptables -t mangle -D INPUT -m owner --uid-owner "$username" -j MARK --set-mark "$mark" 2>/dev/null
@@ -770,7 +792,7 @@ delete_user() {
 list_users() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}   👥 ACTIVE USERS${NC}"
+    echo -e "${CYAN}   👥 ACTIVE USERS (IPv4 Only)${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     
@@ -911,8 +933,9 @@ server_status() {
     echo -e "  ⏱  Uptime: ${GREEN}${uptime}${NC}"
     echo -e "  🔗 Connections: ${CYAN}${conn}${NC}"
     echo -e "  👥 Users: ${GREEN}${users}${NC}"
-    echo -e "  🎯 Mode: ${GREEN}iptables 1:1 (True Precision)${NC}"
+    echo -e "  🎯 Mode: ${GREEN}iptables IPv4 Only (True Precision)${NC}"
     echo -e "  📊 Monitor: $(systemctl is-active traffic-monitor | grep -q active && echo "${GREEN}ON${NC}" || echo "${RED}OFF${NC}")"
+    echo -e "  🚫 IPv6: ${RED}DISABLED${NC}"
     echo ""
     echo -n "Press Enter..."; read
 }
@@ -959,7 +982,7 @@ chmod +x /usr/local/bin/shadow
 # ============================================
 cat > /etc/systemd/system/traffic-monitor.service << 'SERVICEEOF'
 [Unit]
-Description=Shadow SSH True Precision Monitor
+Description=Shadow SSH True Precision Monitor (IPv4)
 After=network.target
 [Service]
 Type=simple
@@ -1008,14 +1031,18 @@ ln -sf /usr/local/bin/shadow /usr/bin/shadow 2>/dev/null
 clear
 echo ""
 echo -e "${PURPLE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║   ${GREEN}✅ SHADOW SSH v27.0 - TRUE PRECISION INSTALLED!${PURPLE}       ║${NC}"
+echo -e "${PURPLE}║   ${GREEN}✅ SHADOW SSH v27.1 - IPv4 ONLY INSTALLED!${PURPLE}            ║${NC}"
 echo -e "${PURPLE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${CYAN}🚀 ${YELLOW}shadow${CYAN} - Open Panel${NC}"
 echo ""
-echo -e "${GREEN}🎯 TRUE PRECISION (iptables):${NC}"
-echo -e "  ✅ iptables byte counting (NO PID deltas)"
-echo -e "  ✅ DIRECT SET (not ADD) - No duplication"
-echo -e "  ✅ Per-user MARK with unique ID"
-echo -e "  ✅ 1:1 accuracy guaranteed"
+echo -e "${GREEN}🎯 v27.1 CHANGES:${NC}"
+echo -e "  ✅ IPv6 completely DISABLED (sysctl + sshd_config)"
+echo -e "  ✅ Only iptables (IPv4) used for counting"
+echo -e "  ✅ ip6tables IGNORED"
+echo -e "  ✅ curl -4 for all external calls"
+echo -e "  ✅ AddressFamily inet in SSH config"
+echo ""
+echo -e "${RED}🚫 IPv6: OFF${NC}"
+echo -e "${GREEN}🎯 IPv4: ONLY${NC}"
 echo ""
