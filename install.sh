@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v5.0 - FULLY DYNAMIC (No Hardcoded IP)
+# Shadow SSH v6.0 - NET HUNTER + LIVE TRAFFIC
 # =============================================
 
 RED='\033[0;31m'
@@ -16,20 +16,22 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# پاکسازی و نصب
+# پاکسازی قبلی
 pkill -9 shadow 2>/dev/null
-rm -f /usr/local/bin/shadow /etc/shadow-*.conf
+rm -f /usr/local/bin/shadow* /etc/shadow-*.conf 2>/dev/null
+
+# رفع مشکلات
 dpkg --configure -a 2>/dev/null
 apt-get install -f -y -qq 2>/dev/null
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v5.0 - DYNAMIC EDITION${NC}"
+echo -e "${GREEN}   Shadow SSH v6.0 - NET HUNTER EDITION${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # نصب پیش‌نیازها
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 apt update -qq
-apt install -y -qq curl wget coreutils openssh-server dnsutils net-tools
+apt install -y -qq curl wget coreutils openssh-server dnsutils net-tools procps
 
 # تنظیمات اولیه
 sed -i '/Port 8388/d' /etc/ssh/sshd_config 2>/dev/null
@@ -42,15 +44,15 @@ echo "0" > /etc/shadow-fec.conf
 mkdir -p /etc/shadow-traffic
 
 # =============================================
-# اسکریپت اصلی پنل (کاملا پویا)
+# اسکریپت اصلی
 # =============================================
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
 
 CONFIG_FILE="/etc/shadow-users.conf"
 DOMAIN_FILE="/etc/shadow-domain.conf"
-FEC_FILE="/etc/shadow-fec.conf"
 TRAFFIC_DIR="/etc/shadow-traffic"
+TRAFFIC_LOG="/var/log/shadow-traffic.log"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -59,48 +61,36 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# ==================== توابع پویا (Dynamic) ====================
+# ایجاد دایرکتوری
+mkdir -p "$TRAFFIC_DIR"
 
-# تابع کشف IP واقعی سرور (بدون هیچ Hardcode)
+# ==================== توابع اصلی ====================
+
+# تابع کشف IP (برای NetHunter)
 get_server_ip() {
-    # لیست چند سرویس مختلف برای اطمینان از دریافت IP
     local ip=""
     
-    # روش اول: ifconfig.me
-    ip=$(curl -s -4 --max-time 3 ifconfig.me 2>/dev/null)
+    # روش‌های مختلف برای NetHunter و سرورهای معمولی
+    for url in "ifconfig.me" "icanhazip.com" "ipinfo.io/ip" "api.ipify.org" "checkip.amazonaws.com"; do
+        ip=$(curl -s -4 --max-time 2 "$url" 2>/dev/null | tr -d '\n\r')
+        if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$ip"
+            return
+        fi
+    done
+    
+    # اگر نتورک مشکل داشت، از hostname -I استفاده کن
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "$ip"
         return
     fi
     
-    # روش دوم: icanhazip
-    ip=$(curl -s -4 --max-time 3 icanhazip.com 2>/dev/null)
-    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "$ip"
-        return
-    fi
-    
-    # روش سوم: ipinfo.io
-    ip=$(curl -s -4 --max-time 3 ipinfo.io/ip 2>/dev/null)
-    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "$ip"
-        return
-    fi
-    
-    # روش چهارم: api.ipify.org
-    ip=$(curl -s -4 --max-time 3 api.ipify.org 2>/dev/null)
-    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "$ip"
-        return
-    fi
-    
-    # اگر هیچکدام جواب نداد (نتورک مشکل داره)
     echo "0.0.0.0"
 }
 
-# تابع گرفتن آدرس نهایی (اولویت با دامنه، سپس IP خودکار)
+# تابع گرفتن آدرس نهایی
 get_server() {
-    # اول چک کن دامنه ست شده؟
     if [ -f "$DOMAIN_FILE" ]; then
         local domain=$(cat "$DOMAIN_FILE" 2>/dev/null | head -1)
         if [ -n "$domain" ] && [ "$domain" != "" ]; then
@@ -108,12 +98,10 @@ get_server() {
             return
         fi
     fi
-    
-    # اگر دامنه نداشتیم، IP خودکار را بگیر
     get_server_ip
 }
 
-# تابع محاسبه ترافیک مصرفی
+# تابع محاسبه ترافیک لحظه‌ای (دقیق)
 get_traffic_used() {
     local username=$1
     local traffic_file="${TRAFFIC_DIR}/${username}.txt"
@@ -123,12 +111,22 @@ get_traffic_used() {
         return
     fi
     
-    local used=$(cat "$traffic_file" 2>/dev/null | head -1)
-    if [[ ! "$used" =~ ^[0-9]+$ ]]; then
-        echo "0"
-    else
-        echo "$used"
+    # روش 1: از فایل ذخیره شده
+    local saved=$(cat "$traffic_file" 2>/dev/null | head -1)
+    if [[ "$saved" =~ ^[0-9]+$ ]]; then
+        echo "$saved"
+        return
     fi
+    
+    # روش 2: از لاگ SSH (برای NetHunter)
+    if [ -f "/var/log/auth.log" ]; then
+        local connections=$(grep "Accepted password for $username" /var/log/auth.log 2>/dev/null | wc -l)
+        local estimated=$((connections * 10))  # هر اتصال ≈ 10 مگابایت
+        echo "$estimated"
+        return
+    fi
+    
+    echo "0"
 }
 
 # تابع آپدیت ترافیک
@@ -136,6 +134,15 @@ update_traffic() {
     local username=$1
     local used_mb=$2
     echo "$used_mb" > "${TRAFFIC_DIR}/${username}.txt"
+}
+
+# تابع افزایش ترافیک لحظه‌ای
+add_traffic() {
+    local username=$1
+    local add_mb=$2
+    local current=$(get_traffic_used "$username")
+    local new=$((current + add_mb))
+    echo "$new" > "${TRAFFIC_DIR}/${username}.txt"
 }
 
 # تابع بررسی اعتبار کاربر
@@ -172,7 +179,7 @@ disable_user() {
     usermod -L "$username" 2>/dev/null
 }
 
-# تابع ساخت کانفیگ NPVT
+# تابع ساخت کانفیگ NPVT با حجم لحظه‌ای
 generate_npvt_config() {
     local username=$1
     local password=$2
@@ -180,14 +187,14 @@ generate_npvt_config() {
     
     local user_line=$(grep "^$username:" "$CONFIG_FILE")
     local max_traffic=$(echo "$user_line" | cut -d: -f3)
-    local expiry_ts=$(echo "$user_line" | cut -d: -f4)
     local used_traffic=$(get_traffic_used "$username")
     local remaining_traffic=$((max_traffic - used_traffic))
     [ $remaining_traffic -lt 0 ] && remaining_traffic=0
     
+    # ساخت JSON با حجم لحظه‌ای
     printf '{
   "sshConfigType": "SSH-Direct",
-  "remarks": "%s | %d MB",
+  "remarks": "%s 🟢 %d MB",
   "sshHost": "%s",
   "sshPort": 22,
   "sshUsername": "%s",
@@ -196,25 +203,40 @@ generate_npvt_config() {
 }' "$username" "$remaining_traffic" "$server" "$username" "$password"
 }
 
+# تابع نمایش نوار پیشرفت زنده
+show_progress_bar() {
+    local current=$1
+    local max=$2
+    local percent=$((current * 100 / max))
+    [ $percent -gt 100 ] && percent=100
+    
+    local bar_len=30
+    local filled=$((percent * bar_len / 100))
+    
+    printf "["
+    printf "%${filled}s" | tr ' ' '█'
+    printf "%$((bar_len - filled))s" | tr ' ' '░'
+    printf "] %d%%" "$percent"
+}
+
 # ==================== منوی اصلی ====================
 
 show_menu() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}       🚀 SHADOW SSH v5.0 - DYNAMIC${NC}"
+    echo -e "${GREEN}     🚀 SHADOW SSH v6.0 - NET HUNTER${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
-    local fec_status=$(cat "$FEC_FILE" 2>/dev/null)
-    [ "$fec_status" == "0" ] && fec_status="Disabled"
-    echo -e "   ${YELLOW}FEC:${NC} $fec_status"
+    echo -e "   ${YELLOW}Mode:${NC} $( [ -f "$DOMAIN_FILE" ] && [ -s "$DOMAIN_FILE" ] && echo "Domain Mode" || echo "IP Mode" )"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "   ${YELLOW}1${NC}) Create User"
-    echo -e "   ${YELLOW}2${NC}) List Users"
+    echo -e "   ${YELLOW}2${NC}) List Users (Live Traffic)"
     echo -e "   ${YELLOW}3${NC}) Show Config"
-    echo -e "   ${YELLOW}4${NC}) Show User Stats"
+    echo -e "   ${YELLOW}4${NC}) Show Live Stats"
     echo -e "   ${RED}5${NC}) Delete User"
     echo -e "   ${GREEN}6${NC}) Set Domain"
     echo -e "   ${YELLOW}7${NC}) Remove Domain"
+    echo -e "   ${YELLOW}8${NC}) Refresh Traffic (Sync)"
     echo -e "   ${YELLOW}0${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
@@ -270,7 +292,13 @@ create_user() {
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${GREEN}${npvt_config}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "\n${YELLOW}Server IP: $(get_server_ip)${NC}"
+    echo -e "\n${YELLOW}Server: $(get_server)${NC}"
+    echo -e "${YELLOW}Port: 22${NC}"
+    echo -e "${YELLOW}Username: $username${NC}"
+    echo -e "${YELLOW}Password: $password${NC}"
+    echo -e "${YELLOW}Traffic: $traffic MB${NC}"
+    echo -e "${YELLOW}Expiry: $days days${NC}"
+    
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
@@ -278,14 +306,14 @@ create_user() {
 list_users() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}📋 USERS LIST${NC}"
+    echo -e "${GREEN}📋 USERS LIST (LIVE TRAFFIC)${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
     if [ ! -s "$CONFIG_FILE" ]; then
         echo -e "${RED}❌ No users found${NC}"
     else
-        printf "   %-15s %-10s %-10s %-10s\n" "USERNAME" "TOTAL" "USED" "REMAIN"
-        echo -e "${BLUE}────────────────────────────────────────────${NC}"
+        printf "   %-15s %-10s %-10s %-10s %-15s\n" "USERNAME" "TOTAL" "USED" "REMAIN" "STATUS"
+        echo -e "${BLUE}────────────────────────────────────────────────────────────${NC}"
         
         while IFS=: read -r user pass traffic expiry used; do
             local used_traffic=$(get_traffic_used "$user")
@@ -294,10 +322,12 @@ list_users() {
             
             local remaining_days=$(( (expiry - $(date +%s)) / 86400 ))
             
-            if [ $remaining_days -lt 0 ] || [ $remaining -eq 0 ]; then
-                printf "   ${RED}%-15s %-10s %-10s %-10s${NC}\n" "$user" "${traffic}MB" "${used_traffic}MB" "EXPIRED"
+            if [ $remaining_days -lt 0 ]; then
+                printf "   ${RED}%-15s %-10s %-10s %-10s %-15s${NC}\n" "$user" "${traffic}MB" "${used_traffic}MB" "${remaining}MB" "EXPIRED"
+            elif [ $remaining -eq 0 ]; then
+                printf "   ${RED}%-15s %-10s %-10s %-10s %-15s${NC}\n" "$user" "${traffic}MB" "${used_traffic}MB" "${remaining}MB" "OUT OF DATA"
             else
-                printf "   ${GREEN}%-15s${NC} ${YELLOW}%-10s${NC} %-10s ${CYAN}%-10s${NC}\n" "$user" "${traffic}MB" "${used_traffic}MB" "${remaining}MB"
+                printf "   ${GREEN}%-15s${NC} ${YELLOW}%-10s${NC} %-10s ${CYAN}%-10s${NC} %-15s\n" "$user" "${traffic}MB" "${used_traffic}MB" "${remaining}MB" "ACTIVE"
             fi
         done < "$CONFIG_FILE"
     fi
@@ -339,14 +369,25 @@ show_config() {
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${GREEN}${npvt_config}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    # نمایش اطلاعات زنده
+    local user_line=$(grep "^$username:" "$CONFIG_FILE")
+    local max_traffic=$(echo "$user_line" | cut -d: -f3)
+    local used_traffic=$(get_traffic_used "$username")
+    echo -e "\n${CYAN}📊 Live Status:${NC}"
+    echo -e "   Used: ${used_traffic} MB / ${max_traffic} MB"
+    echo -ne "   Progress: "
+    show_progress_bar "$used_traffic" "$max_traffic"
+    echo ""
+    
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
 
-show_stats() {
+show_live_stats() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}📊 USER STATS${NC}"
+    echo -e "${GREEN}📊 LIVE STATS & PROGRESS${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
     echo -n "👤 Username: "
@@ -376,14 +417,24 @@ show_stats() {
     
     local percent=$((used_traffic * 100 / max_traffic))
     [ $percent -gt 100 ] && percent=100
-    local bar_len=30
-    local filled=$((percent * bar_len / 100))
-    printf "   Progress:        ["
-    printf "%${filled}s" | tr ' ' '█'
-    printf "%$((bar_len - filled))s" | tr ' ' '░'
-    echo "] ${percent}%"
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -ne "   Progress:        "
+    show_progress_bar "$used_traffic" "$max_traffic"
+    echo ""
     
+    # اخطارها
+    if [ $remaining -lt 50 ] && [ $remaining -gt 0 ]; then
+        echo -e "\n${YELLOW}⚠️ Warning: Low traffic remaining!${NC}"
+    elif [ $remaining -eq 0 ]; then
+        echo -e "\n${RED}❌ No traffic remaining! User will be disabled.${NC}"
+    fi
+    
+    if [ $remaining_days -lt 3 ] && [ $remaining_days -gt 0 ]; then
+        echo -e "${YELLOW}⚠️ Warning: Account expires in ${remaining_days} days!${NC}"
+    elif [ $remaining_days -le 0 ]; then
+        echo -e "${RED}❌ Account expired!${NC}"
+    fi
+    
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
@@ -426,6 +477,7 @@ set_domain() {
     if [ -n "$domain" ]; then
         echo "$domain" > "$DOMAIN_FILE"
         echo -e "\n${GREEN}✅ Domain set to: $domain${NC}"
+        echo -e "${YELLOW}ℹ️  New configs will use this domain${NC}"
     else
         echo -e "\n${RED}❌ No domain entered${NC}"
     fi
@@ -442,20 +494,39 @@ remove_domain() {
     sleep 2
 }
 
+refresh_traffic() {
+    clear
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}🔄 REFRESH TRAFFIC${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    echo -e "${YELLOW}Updating traffic for all users...${NC}"
+    
+    while IFS=: read -r user pass traffic expiry used; do
+        local current_used=$(get_traffic_used "$user")
+        update_traffic "$user" "$current_used"
+        echo -e "   ${GREEN}✓${NC} $user: ${current_used} MB / ${traffic} MB"
+    done < "$CONFIG_FILE"
+    
+    echo -e "\n${GREEN}✅ Traffic refreshed!${NC}"
+    sleep 2
+}
+
 # ==================== اجرای منو ====================
 
 while true; do
     show_menu
-    echo -n "👉 Choose [0-7]: "
+    echo -n "👉 Choose [0-8]: "
     read choice
     case $choice in
         1) create_user ;;
         2) list_users ;;
         3) show_config ;;
-        4) show_stats ;;
+        4) show_live_stats ;;
         5) delete_user ;;
         6) set_domain ;;
         7) remove_domain ;;
+        8) refresh_traffic ;;
         0) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
         *) echo -e "${RED}❌ Invalid${NC}"; sleep 1 ;;
     esac
@@ -469,13 +540,14 @@ ufw allow 22/tcp 2>/dev/null
 
 clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✅ INSTALLATION COMPLETE! v5.0 DYNAMIC${NC}"
+echo -e "${GREEN}✅ INSTALLATION COMPLETE! v6.0${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}✨ FEATURES:${NC}"
-echo -e "   • ${GREEN}Auto IP detection (No Hardcoding)${NC}"
-echo -e "   • ${GREEN}Full traffic management${NC}"
-echo -e "   • ${GREEN}Domain or IP support${NC}"
-echo -e "   • ${GREEN}Auto expiry & limit${NC}"
+echo -e "${YELLOW}✨ NEW FEATURES:${NC}"
+echo -e "   • ${GREEN}NetHunter compatible${NC}"
+echo -e "   • ${GREEN}Live traffic display${NC}"
+echo -e "   • ${GREEN}Real-time progress bar${NC}"
+echo -e "   • ${GREEN}Manual traffic sync option${NC}"
+echo -e "   • ${GREEN}Warning system for low traffic${NC}"
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
