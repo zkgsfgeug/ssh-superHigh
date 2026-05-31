@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v4.0 - FINAL WORKING EDITION
-# با رفع باگ مصرف و DNS
+# Shadow SSH v5.0 - FULLY DYNAMIC (No Hardcoded IP)
 # =============================================
 
 RED='\033[0;31m'
@@ -17,24 +16,22 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# پاکسازی اولیه
+# پاکسازی و نصب
 pkill -9 shadow 2>/dev/null
 rm -f /usr/local/bin/shadow /etc/shadow-*.conf
-
-echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v4.0 - FINAL EDITION${NC}"
-echo -e "${GREEN}════════════════════════════════════════════${NC}"
-
-# رفع مشکلات
 dpkg --configure -a 2>/dev/null
 apt-get install -f -y -qq 2>/dev/null
+
+echo -e "${GREEN}════════════════════════════════════════════${NC}"
+echo -e "${GREEN}   Shadow SSH v5.0 - DYNAMIC EDITION${NC}"
+echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # نصب پیش‌نیازها
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 apt update -qq
 apt install -y -qq curl wget coreutils openssh-server dnsutils net-tools
 
-# حذف پورت 8388
+# تنظیمات اولیه
 sed -i '/Port 8388/d' /etc/ssh/sshd_config 2>/dev/null
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 
@@ -42,15 +39,10 @@ systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 > /etc/shadow-users.conf
 > /etc/shadow-domain.conf
 echo "0" > /etc/shadow-fec.conf
-
-# گرفتن IP سرور
-SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null)
-[ -z "$SERVER_IP" ] && SERVER_IP=$(curl -s -4 icanhazip.com 2>/dev/null)
-[ -z "$SERVER_IP" ] && SERVER_IP=$(curl -s -4 ipinfo.io/ip 2>/dev/null)
-[ -z "$SERVER_IP" ] && SERVER_IP="157.10.52.88"
+mkdir -p /etc/shadow-traffic
 
 # =============================================
-# اسکریپت اصلی
+# اسکریپت اصلی پنل (کاملا پویا)
 # =============================================
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
@@ -58,10 +50,7 @@ cat > /usr/local/bin/shadow << 'INNEREOF'
 CONFIG_FILE="/etc/shadow-users.conf"
 DOMAIN_FILE="/etc/shadow-domain.conf"
 FEC_FILE="/etc/shadow-fec.conf"
-SSH_LOG="/var/log/auth.log"
 TRAFFIC_DIR="/etc/shadow-traffic"
-
-mkdir -p "$TRAFFIC_DIR"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -70,59 +59,61 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# ==================== توابع اصلی ====================
+# ==================== توابع پویا (Dynamic) ====================
 
-# تابع بررسی سلامت دامنه
-check_domain() {
-    local domain=$1
+# تابع کشف IP واقعی سرور (بدون هیچ Hardcode)
+get_server_ip() {
+    # لیست چند سرویس مختلف برای اطمینان از دریافت IP
+    local ip=""
     
-    # حذف http:// و https://
-    domain=$(echo "$domain" | sed 's|^https\?://||' | sed 's|/.*$||')
-    
-    # بررسی فرمت دامنه
-    if [[ ! "$domain" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        echo -e "${RED}❌ Invalid domain format!${NC}"
-        return 1
+    # روش اول: ifconfig.me
+    ip=$(curl -s -4 --max-time 3 ifconfig.me 2>/dev/null)
+    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$ip"
+        return
     fi
     
-    echo -e "${YELLOW}🔍 Checking domain...${NC}"
-    
-    # 1. بررسی DNS
-    local dns_check=$(dig +short "$domain" 2>/dev/null | head -1)
-    if [ -z "$dns_check" ]; then
-        echo -e "${RED}❌ DNS resolution failed! Domain not found.${NC}"
-        return 1
-    fi
-    echo -e "${GREEN}   ✅ DNS resolved to: $dns_check${NC}"
-    
-    # 2. بررسی پینگ
-    if ping -c 2 -W 2 "$domain" &>/dev/null; then
-        echo -e "${GREEN}   ✅ Ping successful${NC}"
-    else
-        echo -e "${YELLOW}   ⚠️  Ping failed (server may block ICMP)${NC}"
+    # روش دوم: icanhazip
+    ip=$(curl -s -4 --max-time 3 icanhazip.com 2>/dev/null)
+    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$ip"
+        return
     fi
     
-    # 3. بررسی پورت 22
-    if timeout 3 nc -zv "$domain" 22 &>/dev/null; then
-        echo -e "${GREEN}   ✅ Port 22 is open${NC}"
-    else
-        echo -e "${RED}   ❌ Port 22 is closed! Cannot use this domain.${NC}"
-        return 1
+    # روش سوم: ipinfo.io
+    ip=$(curl -s -4 --max-time 3 ipinfo.io/ip 2>/dev/null)
+    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$ip"
+        return
     fi
     
-    # 4. بررسی SSH سرویس
-    local ssh_test=$(timeout 3 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no -o BatchMode=yes "$domain" exit 2>&1)
-    if [[ "$ssh_test" == *"Permission denied"* ]] || [[ "$ssh_test" == *"password"* ]]; then
-        echo -e "${GREEN}   ✅ SSH service is responding${NC}"
-    else
-        echo -e "${YELLOW}   ⚠️  SSH service check: $ssh_test${NC}"
+    # روش چهارم: api.ipify.org
+    ip=$(curl -s -4 --max-time 3 api.ipify.org 2>/dev/null)
+    if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$ip"
+        return
     fi
     
-    echo -e "${GREEN}✅ Domain is valid and ready to use!${NC}"
-    return 0
+    # اگر هیچکدام جواب نداد (نتورک مشکل داره)
+    echo "0.0.0.0"
 }
 
-# تابع محاسبه ترافیک واقعی (بدون ضریب)
+# تابع گرفتن آدرس نهایی (اولویت با دامنه، سپس IP خودکار)
+get_server() {
+    # اول چک کن دامنه ست شده؟
+    if [ -f "$DOMAIN_FILE" ]; then
+        local domain=$(cat "$DOMAIN_FILE" 2>/dev/null | head -1)
+        if [ -n "$domain" ] && [ "$domain" != "" ]; then
+            echo "$domain"
+            return
+        fi
+    fi
+    
+    # اگر دامنه نداشتیم، IP خودکار را بگیر
+    get_server_ip
+}
+
+# تابع محاسبه ترافیک مصرفی
 get_traffic_used() {
     local username=$1
     local traffic_file="${TRAFFIC_DIR}/${username}.txt"
@@ -132,30 +123,19 @@ get_traffic_used() {
         return
     fi
     
-    # محاسبه از لاگ با دقت بالا
-    local total_bytes=0
-    
-    # روش 1: از اتصالات فعال SSH
-    if command -v netstat &>/dev/null; then
-        local connections=$(netstat -tn 2>/dev/null | grep ":22" | grep ESTABLISHED | wc -l)
-        total_bytes=$((connections * 1024))  # تخمین 1KB per connection
+    local used=$(cat "$traffic_file" 2>/dev/null | head -1)
+    if [[ ! "$used" =~ ^[0-9]+$ ]]; then
+        echo "0"
+    else
+        echo "$used"
     fi
-    
-    # روش 2: از فایل ذخیره شده
-    local saved=$(cat "$traffic_file" 2>/dev/null)
-    if [ "$saved" -gt "$total_bytes" ]; then
-        total_bytes=$saved
-    fi
-    
-    # تبدیل به مگابایت (برای نمایش)
-    echo $((total_bytes / 1024))
 }
 
-# تابع آپدیت ترافیک (بر حسب کیلوبایت)
+# تابع آپدیت ترافیک
 update_traffic() {
     local username=$1
-    local used_kb=$2
-    echo "$used_kb" > "${TRAFFIC_DIR}/${username}.txt"
+    local used_mb=$2
+    echo "$used_mb" > "${TRAFFIC_DIR}/${username}.txt"
 }
 
 # تابع بررسی اعتبار کاربر
@@ -169,16 +149,16 @@ check_user_validity() {
     
     local user_line=$(grep "^$username:" "$CONFIG_FILE")
     local expiry=$(echo "$user_line" | cut -d: -f4)
-    local max_traffic_mb=$(echo "$user_line" | cut -d: -f3)
-    local used_traffic_mb=$(get_traffic_used "$username")
+    local max_traffic=$(echo "$user_line" | cut -d: -f3)
+    local used_traffic=$(get_traffic_used "$username")
     
     # بررسی انقضا
     if [ "$current_time" -gt "$expiry" ]; then
         return 1
     fi
     
-    # بررسی حجم (بر حسب مگابایت)
-    if [ "$used_traffic_mb" -ge "$max_traffic_mb" ]; then
+    # بررسی حجم
+    if [ "$used_traffic" -ge "$max_traffic" ]; then
         return 1
     fi
     
@@ -190,30 +170,6 @@ disable_user() {
     local username=$1
     pkill -u "$username" 2>/dev/null
     usermod -L "$username" 2>/dev/null
-    usermod -s /sbin/nologin "$username" 2>/dev/null
-}
-
-# تابع گرفتن آدرس سرور (با اعتبارسنجی)
-get_server() {
-    if [ -f "$DOMAIN_FILE" ]; then
-        local domain=$(cat "$DOMAIN_FILE" 2>/dev/null | head -1)
-        if [ -n "$domain" ] && [ "$domain" != "" ]; then
-            # بررسی اینکه دامنه هنوز معتبر است
-            if check_domain "$domain" &>/dev/null; then
-                echo "$domain"
-                return
-            else
-                # دامنه نامعتبر شده، برگرد به IP
-                echo "" > "$DOMAIN_FILE"
-            fi
-        fi
-    fi
-    
-    # برگرداندن IP
-    local ip=$(curl -s -4 ifconfig.me 2>/dev/null)
-    [ -z "$ip" ] && ip=$(curl -s -4 icanhazip.com 2>/dev/null)
-    [ -z "$ip" ] && ip="SERVER_IP_PLACEHOLDER"
-    echo "$ip"
 }
 
 # تابع ساخت کانفیگ NPVT
@@ -227,7 +183,7 @@ generate_npvt_config() {
     local expiry_ts=$(echo "$user_line" | cut -d: -f4)
     local used_traffic=$(get_traffic_used "$username")
     local remaining_traffic=$((max_traffic - used_traffic))
-    local expiry_date=$(date -d "@$expiry_ts" +"%Y-%m-%d")
+    [ $remaining_traffic -lt 0 ] && remaining_traffic=0
     
     printf '{
   "sshConfigType": "SSH-Direct",
@@ -245,7 +201,7 @@ generate_npvt_config() {
 show_menu() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}       🚀 SHADOW SSH v4.0 - FINAL${NC}"
+    echo -e "${GREEN}       🚀 SHADOW SSH v5.0 - DYNAMIC${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
     local fec_status=$(cat "$FEC_FILE" 2>/dev/null)
@@ -257,7 +213,7 @@ show_menu() {
     echo -e "   ${YELLOW}3${NC}) Show Config"
     echo -e "   ${YELLOW}4${NC}) Show User Stats"
     echo -e "   ${RED}5${NC}) Delete User"
-    echo -e "   ${GREEN}6${NC}) Set Domain (with validation)"
+    echo -e "   ${GREEN}6${NC}) Set Domain"
     echo -e "   ${YELLOW}7${NC}) Remove Domain"
     echo -e "   ${YELLOW}0${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
@@ -314,6 +270,7 @@ create_user() {
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${GREEN}${npvt_config}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "\n${YELLOW}Server IP: $(get_server_ip)${NC}"
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
@@ -418,6 +375,7 @@ show_stats() {
     echo -e "   Days Left:       ${remaining_days} days${NC}"
     
     local percent=$((used_traffic * 100 / max_traffic))
+    [ $percent -gt 100 ] && percent=100
     local bar_len=30
     local filled=$((percent * bar_len / 100))
     printf "   Progress:        ["
@@ -465,18 +423,11 @@ set_domain() {
     echo -n "👉 Domain (e.g., example.com): "
     read domain
     
-    if [ -z "$domain" ]; then
-        echo -e "\n${RED}❌ No domain entered${NC}"
-        sleep 2
-        return
-    fi
-    
-    # بررسی کامل دامنه
-    if check_domain "$domain"; then
+    if [ -n "$domain" ]; then
         echo "$domain" > "$DOMAIN_FILE"
-        echo -e "\n${GREEN}✅ Domain set successfully: $domain${NC}"
+        echo -e "\n${GREEN}✅ Domain set to: $domain${NC}"
     else
-        echo -e "\n${RED}❌ Domain validation failed! Not saved.${NC}"
+        echo -e "\n${RED}❌ No domain entered${NC}"
     fi
     sleep 2
 }
@@ -511,9 +462,6 @@ while true; do
 done
 INNEREOF
 
-# جایگزینی placeholder با IP واقعی
-sed -i "s/SERVER_IP_PLACEHOLDER/${SERVER_IP}/g" /usr/local/bin/shadow
-
 chmod +x /usr/local/bin/shadow
 
 # باز کردن پورت
@@ -521,13 +469,13 @@ ufw allow 22/tcp 2>/dev/null
 
 clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✅ INSTALLATION COMPLETE! v4.0${NC}"
+echo -e "${GREEN}✅ INSTALLATION COMPLETE! v5.0 DYNAMIC${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}🔧 FIXES IN THIS VERSION:${NC}"
-echo -e "   • ${GREEN}Fixed traffic counting without FEC${NC}"
-echo -e "   • ${GREEN}Full domain validation (DNS + Ping + Port)${NC}"
-echo -e "   • ${GREEN}Auto-fallback to IP if domain fails${NC}"
-echo -e "   • ${GREEN}Real-time connection tracking${NC}"
+echo -e "${YELLOW}✨ FEATURES:${NC}"
+echo -e "   • ${GREEN}Auto IP detection (No Hardcoding)${NC}"
+echo -e "   • ${GREEN}Full traffic management${NC}"
+echo -e "   • ${GREEN}Domain or IP support${NC}"
+echo -e "   • ${GREEN}Auto expiry & limit${NC}"
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
