@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================
-# Shadow SSH v9.0 - COMPLETE FIX
+# Shadow SSH v10.0 - FINAL STABLE
 # =============================================
 
 RED='\033[0;31m'
@@ -16,13 +16,9 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# پاکسازی کامل قبلی
-echo -e "${YELLOW}🧹 Cleaning previous installation...${NC}"
-rm -rf /usr/local/bin/shadow /usr/local/bin/shadow-monitor /etc/shadow-* /etc/shadow-traffic /etc/systemd/system/shadow-monitor.service 2>/dev/null
-systemctl stop shadow-monitor 2>/dev/null
-systemctl disable shadow-monitor 2>/dev/null
+# پاکسازی کامل
+rm -rf /usr/local/bin/shadow /etc/shadow-* /etc/shadow-traffic 2>/dev/null
 pkill -9 shadow 2>/dev/null
-pkill -9 shadow-monitor 2>/dev/null
 
 for user in $(grep -oP '^[^:]+' /etc/shadow-users.conf 2>/dev/null); do
     userdel -r "$user" 2>/dev/null
@@ -43,11 +39,11 @@ systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
 mkdir -p /etc/shadow-traffic
 
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}   Shadow SSH v9.0 - COMPLETE FIX${NC}"
+echo -e "${GREEN}   Shadow SSH v10.0 - FINAL STABLE${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
 
 # =============================================
-# اسکریپت اصلی (ساده و بدون باگ)
+# اسکریپت اصلی
 # =============================================
 cat > /usr/local/bin/shadow << 'INNEREOF'
 #!/bin/bash
@@ -63,7 +59,29 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# ==================== توابع ====================
+# ==================== توابع اعتبارسنجی ====================
+
+# بررسی اینکه آیا متن فقط حروف انگلیسی و اعداد است
+is_valid_username() {
+    local username=$1
+    if [[ "$username" =~ ^[a-z0-9]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# بررسی اینکه آیا متن فقط عدد است
+is_number() {
+    local num=$1
+    if [[ "$num" =~ ^[0-9]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# ==================== توابع اصلی ====================
 
 get_server_ip() {
     local ip=$(curl -s -4 --max-time 2 ifconfig.me 2>/dev/null)
@@ -81,7 +99,6 @@ get_server() {
     get_server_ip
 }
 
-# تابع ساده و درست برای گرفتن ترافیک
 get_traffic() {
     local user=$1
     local file="${TRAFFIC_DIR}/${user}.txt"
@@ -97,20 +114,10 @@ get_traffic() {
     fi
 }
 
-# تابع ذخیره ترافیک
 set_traffic() {
     local user=$1
     local used=$2
     echo "$used" > "${TRAFFIC_DIR}/${user}.txt"
-}
-
-# تابع افزایش ترافیک (وقتی کاربر مصرف می‌کنه)
-increase_traffic() {
-    local user=$1
-    local amount=$2
-    local current=$(get_traffic "$user")
-    local new=$((current + amount))
-    set_traffic "$user" "$new"
 }
 
 check_user() {
@@ -124,21 +131,10 @@ check_user() {
     local max_traffic=$(echo "$line" | cut -d: -f3)
     local used_traffic=$(get_traffic "$user")
     
-    if [ "$now" -gt "$expiry" ]; then
-        return 1
-    fi
-    
-    if [ "$used_traffic" -ge "$max_traffic" ]; then
-        return 1
-    fi
+    [ "$now" -gt "$expiry" ] && return 1
+    [ "$used_traffic" -ge "$max_traffic" ] && return 1
     
     return 0
-}
-
-disable_user() {
-    local user=$1
-    pkill -u "$user" 2>/dev/null
-    usermod -L "$user" 2>/dev/null
 }
 
 make_config() {
@@ -153,7 +149,7 @@ make_config() {
     cat <<EOF
 {
   "sshConfigType": "SSH-Direct",
-  "remarks": "${user} | ${remain}MB",
+  "remarks": "✅ ${user} | 💾 ${remain} MB",
   "sshHost": "$server",
   "sshPort": 22,
   "sshUsername": "$user",
@@ -168,19 +164,18 @@ EOF
 menu() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}        🚀 SHADOW SSH v9.0${NC}"
+    echo -e "${GREEN}        🚀 SHADOW SSH v10.0${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "   ${YELLOW}Server:${NC} $(get_server):22"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    echo -e "   ${YELLOW}1${NC}) Create User"
-    echo -e "   ${YELLOW}2${NC}) List Users"
-    echo -e "   ${YELLOW}3${NC}) Show Config"
-    echo -e "   ${YELLOW}4${NC}) User Stats"
-    echo -e "   ${RED}5${NC}) Delete User"
-    echo -e "   ${GREEN}6${NC}) Set Domain"
-    echo -e "   ${YELLOW}7${NC}) Remove Domain"
-    echo -e "   ${CYAN}8${NC}) Test Connection"
-    echo -e "   ${YELLOW}0${NC}) Exit"
+    echo -e "   ${GREEN}✅${NC} ${YELLOW}1${NC}) Create User"
+    echo -e "   ${BLUE}📋${NC} ${YELLOW}2${NC}) List Users"
+    echo -e "   ${CYAN}📄${NC} ${YELLOW}3${NC}) Show Config"
+    echo -e "   ${GREEN}📊${NC} ${YELLOW}4${NC}) User Stats"
+    echo -e "   ${RED}🗑️${NC} ${YELLOW}5${NC}) Delete User"
+    echo -e "   ${CYAN}🌐${NC} ${YELLOW}6${NC}) Set Domain"
+    echo -e "   ${YELLOW}🔙${NC} ${YELLOW}7${NC}) Remove Domain"
+    echo -e "   ${RED}❌${NC} ${YELLOW}0${NC}) Exit"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
 }
 
@@ -190,58 +185,94 @@ create_user() {
     echo -e "${GREEN}✨ CREATE USER${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
-    echo -n "👤 Username (english only): "
+    echo -e "${YELLOW}⚠️  Username can ONLY contain:${NC}"
+    echo -e "   ${GREEN}• Lowercase letters (a-z)${NC}"
+    echo -e "   ${GREEN}• Numbers (0-9)${NC}"
+    echo -e "${BLUE}────────────────────────────────────────────${NC}"
+    
+    echo -n "👤 Username: "
     read username
+    
+    # اعتبارسنجی نام کاربری
+    if ! is_valid_username "$username"; then
+        echo -e "\n${RED}❌ ERROR: Invalid username!${NC}"
+        echo -e "${YELLOW}   Username must contain ONLY:${NC}"
+        echo -e "   • Lowercase letters (a-z)"
+        echo -e "   • Numbers (0-9)"
+        echo -e "${RED}   No spaces, no Persian/Arabic letters, no uppercase!${NC}"
+        sleep 3
+        return
+    fi
+    
     echo -n "🔑 Password: "
     read password
-    echo -n "📊 Traffic (MB): "
-    read traffic
-    echo -n "📅 Days: "
-    read days
-
-    if [ -z "$username" ] || [ -z "$password" ] || [ -z "$traffic" ] || [ -z "$days" ]; then
-        echo -e "\n${RED}❌ All fields required!${NC}"
+    
+    if [ -z "$password" ]; then
+        echo -e "\n${RED}❌ Password cannot be empty!${NC}"
         sleep 2
         return
     fi
-
-    if ! [[ "$traffic" =~ ^[0-9]+$ ]] || ! [[ "$days" =~ ^[0-9]+$ ]]; then
-        echo -e "\n${RED}❌ Numbers only!${NC}"
+    
+    echo -n "📊 Traffic (MB): "
+    read traffic
+    
+    if ! is_number "$traffic"; then
+        echo -e "\n${RED}❌ Traffic must be a number!${NC}"
+        sleep 2
+        return
+    fi
+    
+    echo -n "📅 Days: "
+    read days
+    
+    if ! is_number "$days"; then
+        echo -e "\n${RED}❌ Days must be a number!${NC}"
         sleep 2
         return
     fi
 
     if grep -q "^$username:" "$CONFIG_FILE" 2>/dev/null; then
-        echo -e "\n${RED}❌ User exists!${NC}"
+        echo -e "\n${RED}❌ User already exists!${NC}"
         sleep 2
         return
     fi
 
     local expiry=$(date -d "+$days days" +%s)
     
+    # ذخیره اطلاعات
     echo "$username:$password:$traffic:$expiry:0" >> "$CONFIG_FILE"
+    
+    # ساخت کاربر سیستمی
     useradd -M -s /bin/false "$username" 2>/dev/null
     echo "$username:$password" | chpasswd 2>/dev/null
+    
+    # مقدار اولیه ترافیک
     echo "0" > "${TRAFFIC_DIR}/${username}.txt"
     
+    # ساخت کانفیگ
     local config=$(make_config "$username" "$password")
     local b64=$(echo -n "$config" | base64 -w 0)
     local npvt="npvt-ssh://${b64}"
     
     clear
-    echo -e "${GREEN}✅ USER CREATED!${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}✅ USER CREATED SUCCESSFULLY!${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════${NC}"
+    echo -e ""
     echo -e "${YELLOW}📱 NPVT CONFIG:${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${GREEN}${npvt}${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "\n${YELLOW}Server: $(get_server)${NC}"
-    echo -e "${YELLOW}Port: 22${NC}"
-    echo -e "${YELLOW}Username: $username${NC}"
-    echo -e "${YELLOW}Password: $password${NC}"
-    echo -e "${YELLOW}Traffic: $traffic MB${NC}"
-    echo -e "${YELLOW}Expiry: $days days${NC}"
-    echo -e "\n${YELLOW}Press Enter...${NC}"
+    echo -e "${BLUE}────────────────────────────────────────────${NC}"
+    echo -e ""
+    echo -e "${CYAN}📋 Connection Details:${NC}"
+    echo -e "   ${GREEN}✅ Server:${NC} $(get_server)"
+    echo -e "   ${GREEN}✅ Port:${NC} 22"
+    echo -e "   ${GREEN}✅ Username:${NC} $username"
+    echo -e "   ${GREEN}✅ Password:${NC} $password"
+    echo -e "   ${GREEN}✅ Traffic:${NC} $traffic MB"
+    echo -e "   ${GREEN}✅ Expiry:${NC} $days days"
+    echo -e ""
+    echo -e "${YELLOW}Press Enter...${NC}"
     read dummy
 }
 
@@ -252,10 +283,10 @@ list_users() {
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     
     if [ ! -s "$CONFIG_FILE" ]; then
-        echo -e "${RED}❌ No users${NC}"
+        echo -e "${RED}❌ No users found${NC}"
     else
-        printf "   %-15s %-10s %-10s %-10s\n" "USER" "TOTAL" "USED" "REMAIN"
-        echo -e "${BLUE}────────────────────────────────────────────${NC}"
+        printf "   %-15s %-10s %-10s %-10s %-10s\n" "USER" "TOTAL" "USED" "REMAIN" "STATUS"
+        echo -e "${BLUE}──────────────────────────────────────────────────${NC}"
         
         while IFS=: read -r user pass total expiry _; do
             local used=$(get_traffic "$user")
@@ -264,11 +295,11 @@ list_users() {
             local days_left=$(( (expiry - $(date +%s)) / 86400 ))
             
             if [ $days_left -lt 0 ]; then
-                printf "   ${RED}%-15s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "EXPIRED"
+                printf "   ${RED}%-15s %-10s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB" "EXPIRED"
             elif [ $remain -eq 0 ]; then
-                printf "   ${RED}%-15s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "NO DATA"
+                printf "   ${RED}%-15s %-10s %-10s %-10s %-10s${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB" "NO DATA"
             else
-                printf "   ${GREEN}%-15s${NC} ${YELLOW}%-10s${NC} %-10s ${CYAN}%-10s${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB"
+                printf "   ${GREEN}✅${NC} ${GREEN}%-13s${NC} ${YELLOW}%-10s${NC} %-10s ${CYAN}%-10s${NC} ${GREEN}ACTIVE${NC}\n" "$user" "${total}MB" "${used}MB" "${remain}MB"
             fi
         done < "$CONFIG_FILE"
     fi
@@ -288,13 +319,13 @@ show_config() {
     read username
     
     if ! grep -q "^$username:" "$CONFIG_FILE" 2>/dev/null; then
-        echo -e "\n${RED}❌ Not found!${NC}"
+        echo -e "\n${RED}❌ User not found!${NC}"
         sleep 2
         return
     fi
     
     if ! check_user "$username"; then
-        echo -e "\n${RED}⚠️ Expired or out of traffic!${NC}"
+        echo -e "\n${RED}⚠️ User is expired or out of traffic!${NC}"
         sleep 2
         return
     fi
@@ -306,10 +337,18 @@ show_config() {
     
     clear
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}📱 CONFIG for ${username}:${NC}"
-    echo -e "${BLUE}────────────────────────────────────────────${NC}"
+    echo -e "${GREEN}📱 CONFIG FOR: ${CYAN}${username}${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "${GREEN}${npvt}${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
+    
+    # نمایش وضعیت
+    local total=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f3)
+    local used=$(get_traffic "$username")
+    local remain=$((total - used))
+    [ $remain -lt 0 ] && remain=0
+    echo -e "\n${CYAN}📊 Status: ${GREEN}${remain} MB remaining${NC}"
+    
     echo -e "\n${YELLOW}Press Enter...${NC}"
     read dummy
 }
@@ -325,7 +364,7 @@ user_stats() {
     
     local line=$(grep "^$username:" "$CONFIG_FILE" 2>/dev/null)
     if [ -z "$line" ]; then
-        echo -e "\n${RED}❌ Not found!${NC}"
+        echo -e "\n${RED}❌ User not found!${NC}"
         sleep 2
         return
     fi
@@ -341,30 +380,31 @@ user_stats() {
     [ $percent -gt 100 ] && percent=100
     
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}📊 Stats for: ${username}${NC}"
+    echo -e "${CYAN}📊 Statistics for: ${GREEN}${username}${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
-    echo -e "   Total:   ${YELLOW}${total} MB${NC}"
-    echo -e "   Used:    ${RED}${used} MB${NC}"
-    echo -e "   Remain:  ${GREEN}${remain} MB${NC}"
-    echo -e "   Days:    ${days_left} days left${NC}"
+    echo -e "   ${YELLOW}Total Traffic:${NC}   ${total} MB"
+    echo -e "   ${RED}Used Traffic:${NC}    ${used} MB"
+    echo -e "   ${GREEN}Remaining:${NC}       ${remain} MB"
+    echo -e "   ${CYAN}Days Left:${NC}       ${days_left} days"
     
+    # نوار پیشرفت
     local bar_len=30
     local filled=$((percent * bar_len / 100))
-    echo -ne "   Progress: ["
+    echo -ne "   ${YELLOW}Progress:${NC}        ["
     printf "%${filled}s" | tr ' ' '█'
     printf "%$((bar_len - filled))s" | tr ' ' '░'
     echo "] ${percent}%"
     
     if [ $remain -lt 50 ] && [ $remain -gt 0 ]; then
-        echo -e "\n${YELLOW}⚠️ Low traffic: ${remain} MB left${NC}"
-    fi
-    
-    if [ $remain -eq 0 ]; then
-        echo -e "\n${RED}❌ No traffic left! User will be disabled on next connection${NC}"
+        echo -e "\n${YELLOW}⚠️  Warning: Low traffic! (${remain} MB left)${NC}"
+    elif [ $remain -eq 0 ]; then
+        echo -e "\n${RED}❌ No traffic left! User will be disabled.${NC}"
     fi
     
     if [ $days_left -lt 3 ] && [ $days_left -gt 0 ]; then
-        echo -e "${YELLOW}⚠️ Expires in ${days_left} days${NC}"
+        echo -e "${YELLOW}⚠️  Warning: Account expires in ${days_left} days!${NC}"
+    elif [ $days_left -le 0 ]; then
+        echo -e "${RED}❌ Account expired!${NC}"
     fi
     
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
@@ -381,6 +421,12 @@ delete_user() {
     echo -n "👤 Username: "
     read username
     
+    if ! grep -q "^$username:" "$CONFIG_FILE" 2>/dev/null; then
+        echo -e "\n${RED}❌ User not found!${NC}"
+        sleep 2
+        return
+    fi
+    
     echo -n "⚠️ Type 'yes' to confirm: "
     read confirm
     
@@ -395,7 +441,7 @@ delete_user() {
     sed -i "/^$username:/d" "$CONFIG_FILE"
     rm -f "${TRAFFIC_DIR}/${username}.txt"
     
-    echo -e "\n${GREEN}✅ Deleted!${NC}"
+    echo -e "\n${GREEN}✅ User deleted successfully!${NC}"
     sleep 2
 }
 
@@ -404,14 +450,15 @@ set_domain() {
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo -e "${GREEN}🌐 SET DOMAIN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -n "👉 Domain: "
+    echo -n "👉 Domain (e.g., example.com): "
     read domain
     
     if [ -n "$domain" ]; then
         echo "$domain" > "$DOMAIN_FILE"
-        echo -e "\n${GREEN}✅ Domain set: $domain${NC}"
+        echo -e "\n${GREEN}✅ Domain set to: $domain${NC}"
+        echo -e "${YELLOW}ℹ️  New configs will use this domain${NC}"
     else
-        echo -e "\n${RED}❌ Invalid${NC}"
+        echo -e "\n${RED}❌ Invalid domain${NC}"
     fi
     sleep 2
 }
@@ -422,50 +469,15 @@ remove_domain() {
     echo -e "${GREEN}🔙 REMOVE DOMAIN${NC}"
     echo -e "${BLUE}════════════════════════════════════════════${NC}"
     echo "" > "$DOMAIN_FILE"
-    echo -e "${GREEN}✅ Domain removed${NC}"
+    echo -e "${GREEN}✅ Domain removed. Back to IP mode.${NC}"
     sleep 2
-}
-
-test_connection() {
-    clear
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}🔧 TEST CONNECTION${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════${NC}"
-    
-    echo -n "👤 Username: "
-    read username
-    
-    if ! grep -q "^$username:" "$CONFIG_FILE" 2>/dev/null; then
-        echo -e "\n${RED}❌ Not found!${NC}"
-        sleep 2
-        return
-    fi
-    
-    local pass=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
-    local server=$(get_server)
-    
-    echo -e "${YELLOW}Testing connection to $server...${NC}"
-    
-    if timeout 5 sshpass -p "$pass" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$username@$server" exit 2>/dev/null; then
-        echo -e "${GREEN}✅ Connection successful!${NC}"
-    else
-        echo -e "${RED}❌ Connection failed!${NC}"
-        echo -e "${YELLOW}Possible issues:${NC}"
-        echo "   - Wrong username/password"
-        echo "   - Server unreachable"
-        echo "   - Port 22 blocked"
-        echo "   - User expired or out of traffic"
-    fi
-    
-    echo -e "\n${YELLOW}Press Enter...${NC}"
-    read dummy
 }
 
 # ==================== اجرا ====================
 
 while true; do
     menu
-    echo -n "👉 Choose [0-8]: "
+    echo -n "👉 Choose [0-7]: "
     read choice
     case $choice in
         1) create_user ;;
@@ -475,27 +487,32 @@ while true; do
         5) delete_user ;;
         6) set_domain ;;
         7) remove_domain ;;
-        8) test_connection ;;
         0) echo -e "${GREEN}👋 Goodbye!${NC}"; exit 0 ;;
-        *) echo -e "${RED}❌ Invalid${NC}"; sleep 1 ;;
+        *) echo -e "${RED}❌ Invalid choice!${NC}"; sleep 1 ;;
     esac
 done
 INNEREOF
 
 chmod +x /usr/local/bin/shadow
 
-# نصب sshpass برای تست اتصال
-apt install -y -qq sshpass 2>/dev/null
+# پاکسازی فایل‌های اضافی
+rm -f /usr/local/bin/shadow-monitor 2>/dev/null
+rm -f /etc/systemd/system/shadow-monitor.service 2>/dev/null
+systemctl daemon-reload 2>/dev/null
 
 clear
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✅ INSTALLATION COMPLETE! v9.0${NC}"
+echo -e "${GREEN}✅ INSTALLATION COMPLETE! v10.0${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}✨ FIXES IN THIS VERSION:${NC}"
-echo -e "   • ${GREEN}Fixed traffic calculation bug${NC}"
-echo -e "   • ${GREEN}Removed auto-monitor (was causing issues)${NC}"
-echo -e "   • ${GREEN}Added connection test feature${NC}"
-echo -e "   • ${GREEN}Clean and simple code${NC}"
+echo -e ""
+echo -e "${YELLOW}✨ FEATURES:${NC}"
+echo -e "   ${GREEN}✅${NC} Username validation (only a-z, 0-9)"
+echo -e "   ${GREEN}✅${NC} No Persian/Arabic letters allowed"
+echo -e "   ${GREEN}✅${NC} Error message for invalid input"
+echo -e "   ${GREEN}✅${NC} Beautiful icons in config name"
+echo -e "   ${GREEN}✅${NC} Traffic management"
+echo -e "   ${GREEN}✅${NC} Domain support"
+echo -e ""
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
 echo -e "${YELLOW}🚀 Run:${NC} ${GREEN}shadow${NC}"
 echo -e "${GREEN}════════════════════════════════════════════${NC}"
